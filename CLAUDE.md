@@ -33,7 +33,7 @@ Public portfolio project: code quality, tests, security and docs weigh as much a
 
 ## Stack (fixed)
 
-TypeScript (strict) everywhere, pnpm workspaces, Node 22 LTS.
+TypeScript (strict) everywhere except the two root-side helpers (PLAN.md B11), pnpm workspaces, Node 22 LTS.
 
 | Package | Holds |
 |---|---|
@@ -41,7 +41,9 @@ TypeScript (strict) everywhere, pnpm workspaces, Node 22 LTS.
 | `apps/web` | Vite + React, xterm.js terminals, SVG topology rendered from scenario data |
 | `packages/scenario-kit` | scenario schema (zod), loader, topology renderer, checker engine, `scenario:test` CLI |
 | `scenarios/<id>/` | `scenario.yaml`, `topology.clab.yml`, `baseline/`, `fault/`, `workaround/` |
-| `scripts/` | `bootstrap.sh` (root, idempotent), `breakfix-clab` wrapper, `docker-guard` proxy, deploy |
+| `infra/` | root-side helpers in stdlib Python (`bfx_infra`: `breakfix-clab` wrapper, `docker-guard` proxy), systemd units, host image |
+| `scripts/` | `bootstrap.sh` (root, idempotent), `dev-tools.sh`, pinned `versions.env` |
+| `tests/infra/` | Vitest tests that need a bootstrapped host and deploy real labs |
 
 Dependency rule: `scenario-kit` imports nothing from `apps/`; `apps/web` never imports server code
 (shared types come from `scenario-kit` or a `types` export of it).
@@ -90,4 +92,11 @@ Security rules. Each one has an automated test, and a change that weakens one ne
 
 ## Commands
 
-Filled in as they exist (M0 onward).
+| Command | Does |
+|---|---|
+| `pnpm check` | typecheck, eslint, shellcheck, unit tests, root-helper tests. Run before every commit |
+| `pnpm test:infra` | real-lab tests; needs the bootstrapped host. Until the shell has the `breakfix` group, run `sg breakfix -c 'pnpm test:infra'` |
+| `pnpm test:helpers` | Python unit tests for `infra/bfx_infra` (no root, no Docker) |
+| `scripts/dev-tools.sh` | pinned gitleaks + shellcheck into `.tools/bin`, enables the pre-push hook |
+| `sudo scripts/bootstrap.sh` | owner only; re-run after changing anything in `infra/` or `scripts/versions.env` |
+| `sudo -n /usr/local/sbin/breakfix-clab list` | labs currently deployed |

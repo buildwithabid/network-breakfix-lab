@@ -1,0 +1,16 @@
+# Managed by network-breakfix-lab scripts/bootstrap.sh.
+# Every Docker container on this host is created under this slice (daemon.json cgroup-parent),
+# so all labs together can never take more than these limits from the rest of the machine.
+[Unit]
+Description=network-breakfix-lab lab containers (global resource cap)
+Before=slices.target
+
+[Slice]
+MemoryAccounting=yes
+MemoryHigh=2800M
+MemoryMax=3G
+MemorySwapMax=0
+CPUAccounting=yes
+CPUQuota=200%
+TasksAccounting=yes
+TasksMax=4096

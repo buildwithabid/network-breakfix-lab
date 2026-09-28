@@ -1,0 +1,14 @@
+{
+  "name": "@breakfix/server",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Session API, WebSocket terminals, lab lifecycle and checker runs (milestone M3).",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@breakfix/scenario-kit": "workspace:*"
+  }
+}

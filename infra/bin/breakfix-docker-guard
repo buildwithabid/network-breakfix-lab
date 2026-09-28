@@ -1,0 +1,8 @@
+#!/usr/bin/python3 -I
+# Installed root-owned to /usr/local/sbin by scripts/bootstrap.sh; run by breakfix-docker-guard.service.
+import sys
+
+sys.path.insert(0, "/usr/local/lib/breakfix")
+from bfx_infra.guard import main  # noqa: E402
+
+sys.exit(main())

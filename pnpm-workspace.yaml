@@ -1,0 +1,10 @@
+packages:
+  - apps/*
+  - packages/*
+
+# Dependency install scripts are denied unless listed here. These three belong to dockerode's
+# optional SSH transport and protobuf tooling, which this project does not use.
+allowBuilds:
+  cpu-features: false
+  protobufjs: false
+  ssh2: false

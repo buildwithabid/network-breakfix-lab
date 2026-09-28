@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Refuse to push if gitleaks finds a secret anywhere in the history being pushed.
+set -euo pipefail
+REPO_DIR="$(git rev-parse --show-toplevel)"
+GITLEAKS="$REPO_DIR/.tools/bin/gitleaks"
+[[ -x "$GITLEAKS" ]] || { echo "pre-push: run scripts/dev-tools.sh first" >&2; exit 1; }
+"$GITLEAKS" git --redact --no-banner "$REPO_DIR"

@@ -1,0 +1,35 @@
+{
+  "name": "network-breakfix-lab",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Network troubleshooting simulator: real FRRouting labs in containerlab, fixed in the browser, checked automatically.",
+  "license": "MIT",
+  "type": "module",
+  "packageManager": "pnpm@12.6.0",
+  "engines": {
+    "node": ">=22.12 <23"
+  },
+  "scripts": {
+    "build": "pnpm -r run build",
+    "typecheck": "pnpm -r run typecheck && tsc -p tsconfig.tests.json",
+    "lint": "eslint .",
+    "lint:sh": ".tools/bin/shellcheck -x -P SCRIPTDIR/.. scripts/*.sh .githooks/pre-push",
+    "test": "vitest run --project unit",
+    "test:helpers": "python3 -m unittest discover -s infra/tests -t infra",
+    "test:infra": "vitest run --project infra",
+    "check": "pnpm typecheck && pnpm lint && pnpm lint:sh && pnpm test && pnpm test:helpers"
+  },
+  "devDependencies": {
+    "@breakfix/scenario-kit": "workspace:*",
+    "@eslint/js": "10.0.1",
+    "@types/dockerode": "4.0.1",
+    "@types/node": "22.20.4",
+    "dockerode": "5.0.1",
+    "eslint": "10.11.0",
+    "globals": "17.12.0",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.70.1",
+    "vitest": "5.0.2",
+    "yaml": "2.9.1"
+  }
+}

@@ -1,0 +1,43 @@
+# Managed by network-breakfix-lab scripts/bootstrap.sh.
+[Unit]
+Description=network-breakfix-lab Docker API guard
+Documentation=file:///srv/breakfix/docs/security.md
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+User=bfx-guard
+Group=bfx-guard
+SupplementaryGroups=docker breakfix
+ExecStart=/usr/local/sbin/breakfix-docker-guard
+RuntimeDirectory=breakfix-guard
+RuntimeDirectoryMode=0751
+UMask=0077
+Restart=on-failure
+RestartSec=2
+
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictAddressFamilies=AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+
+[Install]
+WantedBy=multi-user.target

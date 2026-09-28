@@ -1,0 +1,8 @@
+#!/usr/bin/python3 -I
+# Installed root-owned to /usr/local/sbin by scripts/bootstrap.sh. -I: ignore PYTHON* env and user site.
+import sys
+
+sys.path.insert(0, "/usr/local/lib/breakfix")
+from bfx_infra.clab import main  # noqa: E402
+
+sys.exit(main())

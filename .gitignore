@@ -10,3 +10,6 @@ playwright-report/
 clab-*/
 *.db
 *.db-*
+.tools/
+__pycache__/
+*.pyc

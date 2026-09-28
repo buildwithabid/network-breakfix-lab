@@ -1,6 +1,6 @@
 # Plan
 
-Status: **plan written, waiting for owner approval. No code yet.**
+Status: **M0 in progress.** Plan approved 28 Sep 2026. Code for M0 written and unit-tested; waiting for the owner to run `sudo scripts/bootstrap.sh`, then the spike and the infra tests.
 
 ## Decisions and brief issues
 
@@ -16,18 +16,25 @@ Status: **plan written, waiting for owner approval. No code yet.**
 | B8 | HTTPS needs a domain, which arrives later. | Until then, the M4 review runs on plain HTTP with basic auth on port 8480: fine for personal review, not for real candidates. HTTPS (Caddy + Let's Encrypt) is added when the domain arrives. |
 | B9 | The brief's scenario format has no way to prove that a workaround fails. | Optional `scenarios/<id>/workaround/`: a known shortcut fix (e.g. a static route instead of fixing OSPF). The self-test deploys it and requires at least one objective to fail. |
 | B10 | "Destroyed on submit or timeout" | On timeout the session is auto-submitted (configs captured, checks run), then the lab is destroyed, so a timed-out candidate still gets results. |
-| R1 | Risk: containerlab may start `linux`-kind nodes privileged by default. | M0 spike checks `HostConfig.Privileged` on a deployed node. If it cannot be turned off, stop and bring options to the owner. |
-| R2 | Risk: FRR may need a capability outside the allowlist. | M0 spike finds the minimum set. Anything beyond `NET_ADMIN, NET_RAW, NET_BIND_SERVICE, SETUID, SETGID, CHOWN, DAC_OVERRIDE, FOWNER, KILL` gets raised before it is used. |
+| R1 | Risk: containerlab may start `linux`-kind nodes privileged by default. | **Resolved from the v0.79.0 source:** `linux` nodes are privileged by default, but `privileged: false` per node is supported. The wrapper always sets it and the guard refuses `Privileged=true`. |
+| R2 | Risk: FRR may need a capability outside the allowlist. | **Confirmed:** every FRR 10.7.1 daemon asks for `SYS_ADMIN` and exits without it (`lib/privs.c`). See B13. The M0 spike narrows the rest of the set. |
+| B11 | The brief says "TypeScript everywhere". | The two root-side helpers (`breakfix-clab`, `docker-guard`) are Python using only the standard library + Debian's `python3-yaml`, run with `python3 -I`. That way no npm package, and nothing from a user-writable path, ever runs with root or Docker access. Everything else is TypeScript. |
+| B12 | "Pin current stable": TypeScript 7.0 is current. | TypeScript **6.0.3**: typescript-eslint 8.70 supports TypeScript < 6.1 only. Revisit when typescript-eslint supports 7. |
+| B13 | FRR needs `SYS_ADMIN` (R2). | Granted to routers only, and contained: Docker `userns-remap` (container root = unprivileged host UID), `no-new-privileges`, default seccomp + AppArmor never overridden, no network egress, vtysh-only access. Documented in docs/security.md. |
+| B14 | containerlab has no `cap-drop` option, and its `.deb` makes the binary setuid root for a `clab_admins` group. | The guard's deploy socket rewrites every container create (`CapDrop=ALL` + the role's caps), and containerlab talks to Docker only through it. Bootstrap removes the setuid bit and empties `clab_admins`. |
+| B15 | B6 (internet access) | **Resolved from the source:** with `network-mode: none` on every node and `mgmt.skip-when-unused: true`, containerlab creates no management network and does not edit `/etc/hosts`. Nodes have only lab links. No firewall rule needed; a test proves no outbound path. |
 
 ## Pinned versions (checked 28 Sep 2026; digests recorded in M0)
 
 | What | Version |
 |---|---|
-| FRRouting image | `quay.io/frrouting/frr:10.7.1` (latest stable) |
-| Host image | `breakfix-host`, built locally from `alpine:3.24.2` + pinned `iproute2`, `iputils`, `traceroute` |
-| containerlab | 0.79.0 (Debian package, version-pinned) |
-| Docker | Docker CE from Docker's apt repo, exact version pinned in `bootstrap.sh` |
-| Node / pnpm | Node 22.23.x (already installed), pnpm pinned via `packageManager` + corepack |
+| FRRouting image | `quay.io/frrouting/frr:10.7.1` pulled by digest `sha256:e995…`; image ID checked at every container create |
+| Host image | `breakfix-host:0.1.0`, built from `alpine:3.24.2@sha256:294b…` + pinned `iproute2-minimal`, `iputils-ping`, `traceroute`, `tini` |
+| containerlab | 0.79.0 (release `.deb`, sha256-checked) |
+| Docker | Docker CE 29.8.1, containerd 2.3.6, buildx 0.37.1 (Docker's apt repo, key fingerprint checked) |
+| Node / pnpm | Node 22.23.2, pnpm 12.6.0 (`packageManager` + corepack) |
+| TypeScript | 6.0.3 (B12) |
+| Dev tools | gitleaks 8.30.1, shellcheck 0.11.0 (sha256-checked, `scripts/dev-tools.sh`) |
 | npm deps | exact versions, lockfile committed |
 
 ## Milestones
@@ -35,12 +42,20 @@ Status: **plan written, waiting for owner approval. No code yet.**
 Each milestone ends with its tests green, docs updated and a commit.
 
 ### M0: Bootstrap
-- [ ] `scripts/bootstrap.sh` (idempotent, run as root). It installs pinned Docker CE and containerlab and `python3-yaml`. It creates the `breakfix` user and group, `/srv/breakfix`, `/var/lib/breakfix` and `breakfix.slice`, with Docker's `cgroup-parent` pointed at it and log size limits set. It installs `breakfix-clab` + a sudoers rule (checked with `visudo -c`) and the `docker-guard` systemd service, pulls the pinned images by digest and builds `breakfix-host`. It checks Node 22 + pnpm, and ends by printing a verification summary.
-- [ ] Spike: an FRR node deployed through `breakfix-clab` runs with no privileged flag and the minimum caps, and `vtysh -c 'show version'` works through `docker-guard`. Resolves R1, R2 and B6. Results go in `docs/security.md`.
-- [ ] pnpm workspace skeleton (`apps/server`, `apps/web`, `packages/scenario-kit`), TS strict, ESLint, Vitest wired.
-- [ ] `docs/SETUP.md` (fresh box + migration), `.env.example`, `.gitignore`, `IDEAS.md`, README stub.
-- [ ] Infra tests: an FRR container runs; the agent user is not in the `docker` group; `breakfix-clab` and `docker-guard` reject out-of-policy requests.
-- [ ] gitleaks (pinned) pre-push hook. Public repo `buildwithabid/network-breakfix-lab` created and pushed.
+- [x] `scripts/bootstrap.sh`: idempotent, run as root. It does the following:
+  - installs pinned Docker CE (userns-remap, `no-new-privileges`, `cgroup-parent: breakfix.slice`) and pinned containerlab (setuid removed);
+  - creates the `breakfix` and `bfx-guard` users and the `breakfix.slice`;
+  - installs `breakfix-clab` + the sudoers rule (whole config re-validated) and the `docker-guard` service;
+  - pulls FRR by digest, builds `breakfix-host`, and records the image IDs;
+  - ends with a verification summary.
+- [x] `breakfix-clab` wrapper and `docker-guard` proxy (`infra/bfx_infra`), plus 40 unit tests (`pnpm test:helpers`): policy, proxy against a fake Docker, wrapper file handling.
+- [x] pnpm workspace skeleton (`apps/server`, `apps/web`, `packages/scenario-kit`), TS strict, ESLint, Vitest (`unit` + `infra` projects).
+- [x] `docs/SETUP.md` (fresh box, migration, uninstall), `docs/security.md`, `.env.example`, `.gitignore`, `IDEAS.md`, README.
+- [x] `scripts/dev-tools.sh` (pinned gitleaks + shellcheck) and a gitleaks pre-push hook.
+- [ ] Owner runs `sudo scripts/bootstrap.sh`.
+- [ ] Spike: the FRR node runs unprivileged with the minimum caps under userns-remap; vtysh works through the guard; narrow the router cap set and update docs/security.md.
+- [ ] Infra tests green (`pnpm test:infra`): host preparation, wrapper refusals, lab hardening, no internet.
+- [ ] Public repo `buildwithabid/network-breakfix-lab` created and pushed (gitleaks clean).
 
 ### M1: Scenario kit + scenario 1 end to end (CLI)
 - [ ] zod schema for `scenario.yaml` (id, title, difficulty, time limit, ticket, objectives, hints). The loader checks that every node in the topology has baseline and fault configs.
