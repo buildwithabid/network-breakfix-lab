@@ -1,0 +1,36 @@
+# Managed by network-breakfix-lab scripts/bootstrap.sh. Deploy the app with scripts/deploy.sh.
+[Unit]
+Description=network-breakfix-lab server
+Documentation=file:///srv/breakfix/app/docs/SETUP.md
+After=network-online.target breakfix-docker-guard.service
+Wants=network-online.target
+Requires=breakfix-docker-guard.service
+ConditionPathExists=/srv/breakfix/app/dist/main.js
+
+[Service]
+Type=simple
+User=breakfix
+Group=breakfix
+WorkingDirectory=/srv/breakfix/app
+EnvironmentFile=/srv/breakfix/server.env
+ExecStart=/usr/bin/node dist/main.js
+Restart=on-failure
+RestartSec=3
+# group-writable database, so the admin (in group breakfix) can create test links
+UMask=0007
+
+PrivateTmp=yes
+InaccessiblePaths=/home
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictRealtime=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+# Deliberately NOT set: NoNewPrivileges, ProtectSystem, CapabilityBoundingSet. The server runs
+# `sudo breakfix-clab`, which needs setuid, and the wrapper runs containerlab inside this unit's
+# namespaces (it writes /var/lib/breakfix-clab, /run/netns). See docs/security.md.
+
+[Install]
+WantedBy=multi-user.target

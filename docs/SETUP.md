@@ -46,19 +46,40 @@ pnpm check        # typecheck, eslint, shellcheck, unit tests, root-helper tests
 pnpm test:infra   # needs step 1: deploys a real lab and checks its hardening
 ```
 
+## 4. Run it as a service
+
+`bootstrap.sh` installs `breakfix-server.service` (user `breakfix`, port 8480). Deploy and (re)start it
+with:
+
+```bash
+scripts/deploy.sh                               # builds, copies to /srv/breakfix/app, restarts
+scripts/deploy.sh --public-url https://lab.example.com   # first run only: sets PUBLIC_URL
+```
+
+The first deploy writes `/srv/breakfix/server.env` (not in git) with generated basic-auth credentials
+and prints them once. Create test links against the production database with:
+
+```bash
+sg breakfix -c 'set -a; . /srv/breakfix/server.env; node /srv/breakfix/app/dist/admin-cli.js link 01-wrong-ip-mask'
+```
+
+Logs: `sudo -n journalctl --no-pager -u breakfix-server.service -n 200`.
+
 ## Moving to another host
 
 1. Run step 1 on the new host.
-2. Copy `/var/lib/breakfix` (the SQLite database, from M3 onward) and `.env`.
+2. Copy `/var/lib/breakfix` (the SQLite database) and `/srv/breakfix/server.env`, then run
+   `scripts/deploy.sh`.
 3. Nothing else carries state: labs are disposable and the reaper removes leftovers.
 
 ## Uninstall
 
 ```bash
-sudo systemctl disable --now breakfix-docker-guard
+sudo systemctl disable --now breakfix-server breakfix-docker-guard
 sudo rm -f /etc/sudoers.d/breakfix /usr/local/sbin/breakfix-clab /usr/local/sbin/breakfix-docker-guard \
-  /etc/systemd/system/breakfix-docker-guard.service /etc/systemd/system/breakfix.slice
-sudo rm -rf /usr/local/lib/breakfix /etc/breakfix /var/lib/breakfix-clab
+  /etc/systemd/system/breakfix-docker-guard.service /etc/systemd/system/breakfix-server.service \
+  /etc/systemd/system/breakfix.slice
+sudo rm -rf /usr/local/lib/breakfix /etc/breakfix /var/lib/breakfix-clab /var/lib/breakfix /srv/breakfix
 sudo apt-mark unhold containerlab docker-ce docker-ce-cli containerd.io docker-buildx-plugin
 sudo apt-get purge containerlab docker-ce docker-ce-cli containerd.io docker-buildx-plugin
 ```

@@ -20,11 +20,13 @@
     "check": "pnpm typecheck && pnpm lint && pnpm lint:sh && pnpm test && pnpm test:helpers",
     "scenario:test": "pnpm --silent --filter @breakfix/scenario-kit run build && node packages/scenario-kit/dist/cli.js test",
     "server": "pnpm --silent -r --filter @breakfix/server... run build && node --env-file-if-exists=.env apps/server/dist/main.js",
-    "admin": "pnpm --silent -r --filter @breakfix/server... run build && node --env-file-if-exists=.env apps/server/dist/admin-cli.js"
+    "admin": "pnpm --silent -r --filter @breakfix/server... run build && node --env-file-if-exists=.env apps/server/dist/admin-cli.js",
+    "test:e2e": "PLAYWRIGHT_BROWSERS_PATH=$PWD/.pw-browsers playwright test"
   },
   "devDependencies": {
     "@breakfix/scenario-kit": "workspace:*",
     "@eslint/js": "10.0.1",
+    "@playwright/test": "1.63.0",
     "@types/dockerode": "4.0.1",
     "@types/node": "22.20.4",
     "@types/ws": "8.18.1",

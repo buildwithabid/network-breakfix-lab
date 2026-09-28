@@ -53,6 +53,15 @@ describe("HTTP API", () => {
     expect(again.statusCode).toBe(409);
   });
 
+  it("previews a link without using it up", async () => {
+    const { app, service } = await setup();
+    const { token } = service.createTestLink("01-wrong-ip-mask");
+    const preview = await app.inject({ method: "POST", url: "/api/preview", payload: { token } });
+    expect(preview.json()).toEqual({ title: "Branch cannot reach the file server", difficulty: "easy", timeLimitMinutes: 20, devices: 4 });
+    expect((await app.inject({ method: "POST", url: "/api/start", payload: { token } })).statusCode).toBe(200);
+    expect((await app.inject({ method: "POST", url: "/api/preview", payload: { token } })).statusCode).toBe(409);
+  });
+
   it("refuses requests without a valid session", async () => {
     const { app, service } = await setup();
     const { sessionId } = await startSession(app, service);

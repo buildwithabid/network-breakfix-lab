@@ -80,6 +80,8 @@ export const ScenarioMeta = z
     ticket: z.string().min(20).max(2000),
     objectives: z.array(Objective).min(1).max(12),
     hints: z.array(z.string().min(3).max(300)).max(8).default([]),
+    /** Optional diagram positions on a grid (column, row). Nodes left out are placed automatically. */
+    layout: z.record(NodeName, z.tuple([z.number().min(0).max(20), z.number().min(0).max(20)])).optional(),
   })
   .strict();
 export type ScenarioMeta = z.infer<typeof ScenarioMeta>;

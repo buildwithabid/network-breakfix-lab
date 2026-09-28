@@ -113,6 +113,10 @@ export async function loadScenario(dir: string): Promise<Scenario> {
   }
   const routers = Object.keys(roles).filter((n) => roles[n] === "router");
 
+  for (const node of Object.keys(meta.layout ?? {})) {
+    if (!(node in topology.topology.nodes)) problems.push(`scenario.yaml: layout: ${node} is not in the topology`);
+  }
+
   const seen = new Set<string>();
   for (const objective of meta.objectives) {
     if (seen.has(objective.id)) problems.push(`scenario.yaml: objective id ${objective.id} is used twice`);

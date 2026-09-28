@@ -76,9 +76,22 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
 
   app.get("/healthz", async () => ({ ok: true }));
 
+  const redeemLimit = { config: { rateLimit: { max: config.START_RATE_LIMIT, timeWindow: "1 minute" } } };
+  const linkError = (reply: FastifyReply, err: TestLinkError) =>
+    reply.code({ invalid: 404, used: 409, expired: 410 }[err.code]).send({ error: err.message, code: err.code });
+
+  app.post("/api/preview", redeemLimit, async (req, reply) => {
+    try {
+      return service.preview((req.body as { token?: unknown } | undefined)?.token);
+    } catch (err) {
+      if (err instanceof TestLinkError) return linkError(reply, err);
+      throw err;
+    }
+  });
+
   app.post(
     "/api/start",
-    { config: { rateLimit: { max: config.START_RATE_LIMIT, timeWindow: "1 minute" } } },
+    redeemLimit,
     async (req, reply) => {
       const token = (req.body as { token?: unknown } | undefined)?.token;
       try {
@@ -92,10 +105,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
         });
         return { sessionId };
       } catch (err) {
-        if (err instanceof TestLinkError) {
-          const status = { invalid: 404, used: 409, expired: 410 }[err.code];
-          return reply.code(status).send({ error: err.message, code: err.code });
-        }
+        if (err instanceof TestLinkError) return linkError(reply, err);
         throw err;
       }
     },

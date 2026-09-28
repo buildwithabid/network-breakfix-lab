@@ -3,6 +3,7 @@ import { type Scenario, checkObjectives, newLabName } from "@breakfix/scenario-k
 import type { SessionRow, Store } from "../db/store.js";
 import type { LabDriver, LabHandle } from "../labs/driver.js";
 import { type NetModel, POLL_COMMANDS, type RouterPoll, type TopoState, buildModel, deriveTopoState, linksOf, pollFromDocs } from "../labs/network.js";
+import { type Positions, layoutNodes } from "../labs/layout.js";
 import { hashToken, isToken, matchesHash, newId, newToken } from "../security/tokens.js";
 
 export interface Logger {
@@ -40,7 +41,15 @@ export interface SessionView {
     hintCount: number;
     nodes: { name: string; role: string }[];
     links: ReturnType<typeof linksOf>;
+    positions: Positions;
   };
+}
+
+export interface TestPreview {
+  title: string;
+  difficulty: string;
+  timeLimitMinutes: number;
+  devices: number;
 }
 
 interface RunningLab {
@@ -107,8 +116,7 @@ export class SessionService extends EventEmitter {
     return { testId, token };
   }
 
-  /** Redeem a test link. Each link starts exactly one session. */
-  start(token: unknown): { sessionId: string; secret: string } {
+  private redeemable(token: unknown): { test: NonNullable<ReturnType<Store["testByTokenHash"]>>; scenario: Scenario } {
     if (!isToken(token)) throw new TestLinkError("invalid", "This test link is not valid.");
     const test = this.opts.store.testByTokenHash(hashToken(token));
     if (!test) throw new TestLinkError("invalid", "This test link is not valid.");
@@ -116,6 +124,23 @@ export class SessionService extends EventEmitter {
     if (test.used_at !== null) throw new TestLinkError("used", "This test link has already been used.");
     const scenario = this.opts.scenarios.get(test.scenario_id);
     if (!scenario) throw new TestLinkError("invalid", "This test link is not valid.");
+    return { test, scenario };
+  }
+
+  /** What the landing page shows before the candidate starts. Does not use up the link. */
+  preview(token: unknown): TestPreview {
+    const { scenario } = this.redeemable(token);
+    return {
+      title: scenario.meta.title,
+      difficulty: scenario.meta.difficulty,
+      timeLimitMinutes: scenario.meta.timeLimitMinutes,
+      devices: Object.keys(scenario.roles).length,
+    };
+  }
+
+  /** Redeem a test link. Each link starts exactly one session. */
+  start(token: unknown): { sessionId: string; secret: string } {
+    const { test, scenario } = this.redeemable(token);
 
     const secret = newToken();
     const session: SessionRow = {
@@ -169,6 +194,12 @@ export class SessionService extends EventEmitter {
         hintCount: scenario.meta.hints.length,
         nodes: Object.entries(scenario.roles).map(([name, role]) => ({ name, role })),
         links: linksOf(scenario.topology),
+        positions: layoutNodes(
+          Object.keys(scenario.roles),
+          linksOf(scenario.topology),
+          scenario.meta.layout ?? {},
+          Object.keys(scenario.roles).find((n) => scenario.roles[n] === "host"),
+        ),
       },
     };
   }

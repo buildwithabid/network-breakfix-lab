@@ -179,7 +179,7 @@ ok "containerlab $(containerlab version 2>/dev/null | awk '/version:/{print $2}'
 log "Directories"
 install -d -m 0755 -o root -g root /etc/breakfix /usr/local/lib/breakfix
 install -d -m 0711 -o root -g root /var/lib/breakfix-clab /var/lib/breakfix-clab/labs
-install -d -m 0750 -o breakfix -g breakfix /var/lib/breakfix
+install -d -m 2770 -o breakfix -g breakfix /var/lib/breakfix
 if [[ -n "$DEV_USER" ]]; then
   install -d -m 2750 -o "$DEV_USER" -g breakfix /srv/breakfix
 else
@@ -215,6 +215,17 @@ Defaults!/usr/local/sbin/breakfix-clab env_reset, !setenv
 User_Alias BFX_CLAB_USERS = ${users}
 BFX_CLAB_USERS ALL=(root) NOPASSWD: /usr/local/sbin/breakfix-clab
 EOF
+if [[ -n "$DEV_USER" ]]; then
+  # Exact commands only. --no-pager matters: a pager started as root is a shell escape.
+  cat >> "$tmp_sudoers" <<EOF
+Cmnd_Alias BFX_SERVICE = /usr/bin/systemctl restart breakfix-server.service, \\
+  /usr/bin/systemctl stop breakfix-server.service, \\
+  /usr/bin/systemctl --no-pager status breakfix-server.service, \\
+  /usr/bin/journalctl --no-pager -u breakfix-server.service -n 200
+Defaults!BFX_SERVICE env_reset, !setenv
+${DEV_USER} ALL=(root) NOPASSWD: BFX_SERVICE
+EOF
+fi
 visudo -cq -f "$tmp_sudoers" || die "generated sudoers file is invalid"
 install_file "$tmp_sudoers" /etc/sudoers.d/breakfix 0440 root:root || true
 rm -f "$tmp_sudoers"
@@ -271,6 +282,15 @@ for _ in $(seq 1 50); do [[ -S /run/breakfix-guard/app.sock ]] && break; sleep 0
 [[ -S /run/breakfix-guard/app.sock && -S /run/breakfix-guard/deploy.sock ]] \
   || die "docker-guard sockets did not appear (journalctl -u breakfix-docker-guard)"
 ok "active, sockets in /run/breakfix-guard"
+
+# --------------------------------------------------------------------------------------------
+log "Server service (started by scripts/deploy.sh)"
+if install_file "$INFRA/systemd/breakfix-server.service" /etc/systemd/system/breakfix-server.service 0644 root:root; then
+  systemctl daemon-reload
+  if systemctl is-active --quiet breakfix-server.service; then systemctl restart breakfix-server.service; fi
+fi
+systemctl enable breakfix-server.service >/dev/null 2>&1
+ok "breakfix-server.service installed and enabled"
 
 # --------------------------------------------------------------------------------------------
 log "Verification"

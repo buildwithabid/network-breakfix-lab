@@ -127,6 +127,17 @@ two can never drift apart.
 | Polling is invisible | the live diagram's `show … json` polling runs through a separate exec, never a candidate terminal, so it never enters the command log | `service.test.ts`, `server.test.ts` |
 | Leftover labs | the reaper destroys session labs whose session is over, unknown, or 5 min past its deadline, and test labs older than 2 h | `service.test.ts`, `tests/infra/reaper.test.ts` |
 
+### The service unit
+
+`breakfix-server.service` runs as `breakfix` with a private `/tmp`, `/home` made inaccessible, and
+kernel, clock and personality protections. It deliberately does **not** set `NoNewPrivileges`,
+`ProtectSystem` or a capability bounding set: the server starts labs with `sudo breakfix-clab`
+(setuid), and the wrapper runs containerlab inside the unit's namespaces. Moving the wrapper behind
+its own socket (like docker-guard) would lift that limit; see IDEAS.md.
+
+The developer's sudo rights for the service are exact commands only (restart, stop, status and the
+last 200 log lines), each with `--no-pager`: a pager running as root is a shell escape.
+
 ## Host protection
 
 This project currently shares a host with other services. `breakfix.slice` caps all lab containers

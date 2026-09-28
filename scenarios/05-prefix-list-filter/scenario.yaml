@@ -26,3 +26,9 @@ hints:
   - "Does r2 know 10.0.5.0/24 at all? Check `show bgp ipv4 unicast` on r2."
   - "Is r1 advertising it? `show bgp ipv4 unicast neighbors 10.0.12.2 advertised-routes` on r1."
   - Outbound policy is applied per neighbour. Look for a filter on that neighbour.
+layout:
+  h1: [0, 0]
+  h5: [0, 2]
+  r1: [2, 1]
+  r2: [4, 1]
+  srv: [6, 1]
