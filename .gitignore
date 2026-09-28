@@ -1,0 +1,12 @@
+node_modules/
+.env
+CLAUDE.local.md
+.pw-browsers/
+dist/
+coverage/
+test-results/
+playwright-report/
+.labs/
+clab-*/
+*.db
+*.db-*
