@@ -49,13 +49,23 @@ export interface ExecResult {
   stderr: string;
 }
 
-export async function execIn(docker: Docker, container: string, cmd: string[]): Promise<ExecResult> {
+export async function execIn(
+  docker: Docker,
+  container: string,
+  cmd: string[],
+  stdin?: string,
+): Promise<ExecResult> {
   const exec = await docker.getContainer(container).exec({
     Cmd: cmd,
+    AttachStdin: stdin !== undefined,
     AttachStdout: true,
     AttachStderr: true,
   });
-  const stream = await exec.start({ hijack: true, stdin: false });
+  const stream = await exec.start({ hijack: true, stdin: stdin !== undefined });
+  if (stdin !== undefined) {
+    stream.write(stdin);
+    stream.end();
+  }
   const out = new PassThrough();
   const err = new PassThrough();
   const chunks: { out: Buffer[]; err: Buffer[] } = { out: [], err: [] };

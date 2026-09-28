@@ -33,7 +33,7 @@ describe("a lab deployed through breakfix-clab", () => {
   });
 
   it.each([
-    ["r1", { caps: 10, memory: 256 * MIB, pids: 256 }],
+    ["r1", { caps: 8, memory: 256 * MIB, pids: 256 }],
     ["h1", { caps: 2, memory: 64 * MIB, pids: 64 }],
   ] as const)("hardens %s: no privileged, CapDrop ALL, no network, limits", async (node, want) => {
     const info = await docker.getContainer(`clab-${name}-${node}`).inspect();
@@ -64,6 +64,12 @@ describe("a lab deployed through breakfix-clab", () => {
     const routes = await execIn(docker, r1, ["vtysh", "-c", "show ip route json"]);
     const table = JSON.parse(routes.stdout) as Record<string, { protocol: string }[]>;
     expect(table["10.0.1.0/24"]?.[0]?.protocol).toBe("connected");
+  });
+
+  it("saves the config cleanly with write memory", async () => {
+    const res = await execIn(docker, r1, ["vtysh"], "write memory\nexit\n");
+    expect(res.stdout).toContain("[OK]");
+    expect(res.stdout).not.toMatch(/Error|failed|can't/i);
   });
 
   it("wires the link: the host reaches its gateway", async () => {

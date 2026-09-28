@@ -41,24 +41,22 @@ MAX_CONFIG_BYTES = 256 * 1024
 
 ROLES = ("router", "host")
 
-# Upper bound of Linux capabilities per role. The guard always sends CapDrop=["ALL"] and then adds
-# back only the capabilities the topology asked for, which must be a subset of this set.
-# docs/security.md explains each one. FRR's daemons request SYS_ADMIN at start-up
-# (lib/privs.c exits if cap_set_proc fails), which is why it is here; user-namespace remapping
-# keeps it from meaning anything outside the container.
+# Linux capabilities per role. The guard always sends CapDrop=["ALL"] and then adds back only the
+# capabilities the topology asked for, which must be a subset of this set. The router set is the
+# measured minimum for FRR 10.7.1 (OSPF, BGP, static, `write memory`); docs/security.md explains
+# each one. FRR's daemons request SYS_ADMIN at start-up (lib/privs.c exits if cap_set_proc fails);
+# user-namespace remapping keeps it from meaning anything outside the container.
 CAPS_MAX: dict[str, frozenset[str]] = {
     "router": frozenset(
         {
-            "NET_ADMIN",
-            "NET_RAW",
-            "NET_BIND_SERVICE",
-            "SYS_ADMIN",
-            "SETUID",
-            "SETGID",
             "CHOWN",
             "DAC_OVERRIDE",
-            "FOWNER",
-            "KILL",
+            "NET_ADMIN",
+            "NET_BIND_SERVICE",
+            "NET_RAW",
+            "SETGID",
+            "SETUID",
+            "SYS_ADMIN",
         }
     ),
     "host": frozenset({"NET_ADMIN", "NET_RAW"}),
@@ -71,7 +69,10 @@ LIMITS: dict[str, dict[str, int]] = {
     "host": {"memory": 64 * MIB, "cpu_quota": 25_000, "pids": 64},
 }
 
-ROUTER_CONFIG_TARGETS = frozenset({"/etc/frr/frr.conf", "/etc/frr/daemons", "/etc/frr/vtysh.conf"})
+# A router's whole /etc/frr comes from one lab directory, so `write memory` can rename files there.
+ROUTER_CONFIG_DIR = "/etc/frr"
+ROUTER_CONFIG_FILES = ("frr.conf", "daemons", "vtysh.conf")
+ROUTER_CONFIG_REQUIRED = ("frr.conf", "daemons")
 
 ROUTER_SYSCTLS = {
     "net.ipv4.ip_forward": "1",
@@ -140,7 +141,7 @@ class LabPlan:
 
     name: str
     topology: dict[str, Any]
-    files: list[str] = field(default_factory=list)
+    config_dirs: dict[str, str] = field(default_factory=dict)  # router -> relative source dir
     roles: dict[str, str] = field(default_factory=dict)
 
 
@@ -162,6 +163,16 @@ def _check_rel_path(rel: str) -> str:
     if not REL_PATH_RE.fullmatch(rel) or ".." in rel.split("/"):
         raise PolicyError(f"bind source {rel!r} must be a plain relative path inside the lab")
     return rel
+
+
+def _parse_config_bind(bind: object, where: str) -> str:
+    """'<dir>:/etc/frr' or '<dir>:/etc/frr:rw' -> '<dir>'."""
+    if not isinstance(bind, str):
+        raise PolicyError(f"{where}: bind must be a string")
+    parts = bind.split(":")
+    if len(parts) not in (2, 3) or parts[1] != ROUTER_CONFIG_DIR or parts[2:] not in ([], ["rw"]):
+        raise PolicyError(f"{where}: the only bind allowed is '<config-dir>:{ROUTER_CONFIG_DIR}'")
+    return _check_rel_path(parts[0])
 
 
 def _normalise_caps(caps: object, role: str, where: str) -> list[str]:
@@ -220,7 +231,7 @@ def validate_topology(doc: object, images: ImagePolicy, lab_dir: str) -> LabPlan
     if len(nodes) > MAX_NODES:
         raise PolicyError(f"at most {MAX_NODES} nodes")
 
-    files: list[str] = []
+    config_dirs: dict[str, str] = {}
     roles: dict[str, str] = {}
     out_nodes: dict[str, Any] = {}
 
@@ -239,26 +250,22 @@ def validate_topology(doc: object, images: ImagePolicy, lab_dir: str) -> LabPlan
             raise PolicyError(f"{where}: image {image!r} is not an allowed lab image")
         roles[node_name] = role
 
-        binds_out: list[str] = []
         binds = node.get("binds") or []
         if not isinstance(binds, list):
             raise PolicyError(f"{where}: binds must be a list")
-        if binds and role != "router":
+        binds_out: list[str] = []
+        if role == "router":
+            if len(binds) != 1:
+                raise PolicyError(
+                    f"{where}: a router needs exactly one bind '<config-dir>:{ROUTER_CONFIG_DIR}'"
+                )
+            rel_dir = _parse_config_bind(binds[0], where)
+            if rel_dir in config_dirs.values():
+                raise PolicyError(f"{where}: config directory {rel_dir!r} is used by another router")
+            config_dirs[node_name] = rel_dir
+            binds_out.append(f"{posixpath.join(lab_dir, 'files', rel_dir)}:{ROUTER_CONFIG_DIR}")
+        elif binds:
             raise PolicyError(f"{where}: only routers may bind config files")
-        seen_targets: set[str] = set()
-        for bind in binds:
-            if not isinstance(bind, str) or bind.count(":") not in (1, 2):
-                raise PolicyError(f"{where}: bind must look like 'file:/etc/frr/frr.conf'")
-            parts = bind.split(":")
-            src, target = parts[0], parts[1]
-            if len(parts) == 3 and parts[2] not in ("ro", "rw"):
-                raise PolicyError(f"{where}: bind option must be ro or rw")
-            _check_rel_path(src)
-            if target not in ROUTER_CONFIG_TARGETS or target in seen_targets:
-                raise PolicyError(f"{where}: bind target {target!r} not allowed")
-            seen_targets.add(target)
-            files.append(src)
-            binds_out.append(f"{posixpath.join(lab_dir, 'files', src)}:{target}")
 
         exec_cmds = node.get("exec")
         if exec_cmds is not None and role != "host":
@@ -315,7 +322,7 @@ def validate_topology(doc: object, images: ImagePolicy, lab_dir: str) -> LabPlan
         "mgmt": {"skip-when-unused": True},
         "topology": {"nodes": out_nodes, "links": links_out},
     }
-    return LabPlan(name=name, topology=topology, files=files, roles=roles)
+    return LabPlan(name=name, topology=topology, config_dirs=config_dirs, roles=roles)
 
 
 # ---------------------------------------------------------------------------------------------
@@ -442,25 +449,21 @@ def sanitize_create(
     binds = hc.get("Binds") or []
     if not isinstance(binds, list):
         raise PolicyError("create: Binds must be a list")
-    if binds and role != "router":
+    if role == "router" and len(binds) != 1:
+        raise PolicyError("create: a router needs exactly one config bind")
+    if role != "router" and binds:
         raise PolicyError("create: only routers may have binds")
     for bind in binds:
-        if not isinstance(bind, str):
-            raise PolicyError("create: bad bind")
-        parts = bind.split(":")
-        if len(parts) not in (2, 3):
-            raise PolicyError(f"create: bad bind {bind!r}")
-        src, target = parts[0], parts[1]
+        parts = bind.split(":") if isinstance(bind, str) else []
+        if len(parts) not in (2, 3) or parts[1] != ROUTER_CONFIG_DIR or parts[2:] not in ([], ["rw"]):
+            raise PolicyError(f"create: bind {bind!r} not allowed")
+        src = parts[0]
         if (
             not src.startswith(lab_files)
             or posixpath.normpath(src) != src
             or not REL_PATH_RE.fullmatch(src[len(lab_files):])
         ):
             raise PolicyError(f"create: bind source {src!r} is outside the lab directory")
-        if target not in ROUTER_CONFIG_TARGETS:
-            raise PolicyError(f"create: bind target {target!r} not allowed")
-        if len(parts) == 3 and parts[2] not in ("ro", "rw"):
-            raise PolicyError("create: bind option must be ro or rw")
 
     sysctls = hc.get("Sysctls") or {}
     if not isinstance(sysctls, dict) or any(
@@ -588,6 +591,14 @@ def check_host_command(cmd: list[str]) -> None:
         raise PolicyError(f"host command {prog!r} not allowed")
 
 
+def _is_show_batch(cmd: list[str]) -> bool:
+    """vtysh -c "show ..." [-c "show ..."]... with 1-8 read-only show commands."""
+    args = cmd[1:]
+    if cmd[:1] != ["vtysh"] or not args or len(args) % 2 or len(args) > 16:
+        return False
+    return all(flag == "-c" and SHOW_RE.fullmatch(show) for flag, show in zip(args[::2], args[1::2]))
+
+
 def sanitize_exec(role: str, body: object) -> dict[str, Any]:
     """Check a POST /containers/{id}/exec body and return the body to forward to Docker."""
     if not isinstance(body, dict):
@@ -604,7 +615,7 @@ def sanitize_exec(role: str, body: object) -> dict[str, Any]:
     cmd = body.get("Cmd")
     if (
         not isinstance(cmd, list)
-        or not 1 <= len(cmd) <= 16
+        or not 1 <= len(cmd) <= 17
         or not all(isinstance(a, str) and 0 < len(a) <= 256 and "\x00" not in a for a in cmd)
     ):
         raise PolicyError("exec: Cmd must be a list of 1-16 non-empty strings")
@@ -613,12 +624,14 @@ def sanitize_exec(role: str, body: object) -> dict[str, Any]:
     if role == "router":
         if cmd == ["vtysh"]:
             pass
-        elif len(cmd) == 3 and cmd[:2] == ["vtysh", "-c"] and SHOW_RE.fullmatch(cmd[2]) and not tty:
+        elif not tty and _is_show_batch(cmd):
             pass
         else:
-            raise PolicyError("exec: routers only allow 'vtysh' or 'vtysh -c \"show ...\"'")
+            raise PolicyError("exec: routers only allow 'vtysh' or 'vtysh -c \"show ...\"' (up to 8)")
         # The pager is a shell escape (more/less '!'); vtysh must never start one.
         env = ["VTYSH_PAGER=cat"]
+        if tty:
+            env.append("TERM=xterm-256color")
     elif role == "host":
         if tty:
             raise PolicyError("exec: hosts have no interactive terminal")

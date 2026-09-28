@@ -17,11 +17,12 @@ Status: **M0 in progress.** Plan approved 28 Sep 2026. Code for M0 written and u
 | B9 | The brief's scenario format has no way to prove that a workaround fails. | Optional `scenarios/<id>/workaround/`: a known shortcut fix (e.g. a static route instead of fixing OSPF). The self-test deploys it and requires at least one objective to fail. |
 | B10 | "Destroyed on submit or timeout" | On timeout the session is auto-submitted (configs captured, checks run), then the lab is destroyed, so a timed-out candidate still gets results. |
 | R1 | Risk: containerlab may start `linux`-kind nodes privileged by default. | **Resolved from the v0.79.0 source:** `linux` nodes are privileged by default, but `privileged: false` per node is supported. The wrapper always sets it and the guard refuses `Privileged=true`. |
-| R2 | Risk: FRR may need a capability outside the allowlist. | **Confirmed:** every FRR 10.7.1 daemon asks for `SYS_ADMIN` and exits without it (`lib/privs.c`). See B13. The M0 spike narrows the rest of the set. |
+| R2 | Risk: FRR may need a capability outside the allowlist. | **Confirmed:** every FRR 10.7.1 daemon asks for `SYS_ADMIN` and exits without it (`lib/privs.c`). See B13. The spike measured the full set: 8 caps (docs/security.md). |
 | B11 | The brief says "TypeScript everywhere". | The two root-side helpers (`breakfix-clab`, `docker-guard`) are Python using only the standard library + Debian's `python3-yaml`, run with `python3 -I`. That way no npm package, and nothing from a user-writable path, ever runs with root or Docker access. Everything else is TypeScript. |
 | B12 | "Pin current stable": TypeScript 7.0 is current. | TypeScript **6.0.3**: typescript-eslint 8.70 supports TypeScript < 6.1 only. Revisit when typescript-eslint supports 7. |
 | B13 | FRR needs `SYS_ADMIN` (R2). | Granted to routers only, and contained: Docker `userns-remap` (container root = unprivileged host UID), `no-new-privileges`, default seccomp + AppArmor never overridden, no network egress, vtysh-only access. Documented in docs/security.md. |
 | B14 | containerlab has no `cap-drop` option, and its `.deb` makes the binary setuid root for a `clab_admins` group. | The guard's deploy socket rewrites every container create (`CapDrop=ALL` + the role's caps), and containerlab talks to Docker only through it. Bootstrap removes the setuid bit and empties `clab_admins`. |
+| B16 | Spike finding: binding `frr.conf` as a single file makes `write memory` print "Error renaming … Resource busy". | Each router's whole `/etc/frr` is one lab directory (owned by the container's remapped root) holding only `frr.conf`, `daemons`, `vtysh.conf`. `write memory` saves cleanly; a test checks it. |
 | B15 | B6 (internet access) | **Resolved from the source:** with `network-mode: none` on every node and `mgmt.skip-when-unused: true`, containerlab creates no management network and does not edit `/etc/hosts`. Nodes have only lab links. No firewall rule needed; a test proves no outbound path. |
 
 ## Pinned versions (checked 28 Sep 2026; digests recorded in M0)
@@ -52,8 +53,9 @@ Each milestone ends with its tests green, docs updated and a commit.
 - [x] pnpm workspace skeleton (`apps/server`, `apps/web`, `packages/scenario-kit`), TS strict, ESLint, Vitest (`unit` + `infra` projects).
 - [x] `docs/SETUP.md` (fresh box, migration, uninstall), `docs/security.md`, `.env.example`, `.gitignore`, `IDEAS.md`, README.
 - [x] `scripts/dev-tools.sh` (pinned gitleaks + shellcheck) and a gitleaks pre-push hook.
-- [ ] Owner runs `sudo scripts/bootstrap.sh`.
-- [ ] Spike: the FRR node runs unprivileged with the minimum caps under userns-remap; vtysh works through the guard; narrow the router cap set and update docs/security.md.
+- [x] Owner runs `sudo scripts/bootstrap.sh` (28 Sep).
+- [x] Spike: FRR 10.7.1 runs unprivileged under userns-remap with `CapDrop=ALL`; vtysh works through the guard; no route to the internet. Router caps measured with a two-router OSPF + BGP lab, removing one cap per run: 8 needed, `FOWNER` and `KILL` dropped (docs/security.md).
+- [ ] Owner re-runs `sudo scripts/bootstrap.sh` to install the tightened policy (8 router caps, `/etc/frr` directory bind, `TERM` for interactive vtysh, batched `show` commands, quieter guard log).
 - [ ] Infra tests green (`pnpm test:infra`): host preparation, wrapper refusals, lab hardening, no internet.
 - [ ] Public repo `buildwithabid/network-breakfix-lab` created and pushed (gitleaks clean).
 

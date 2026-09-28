@@ -33,7 +33,7 @@ def good_topology() -> dict:
                 "r1": {
                     "kind": "linux",
                     "image": FRR,
-                    "binds": ["r1/frr.conf:/etc/frr/frr.conf", "r1/daemons:/etc/frr/daemons"],
+                    "binds": ["r1:/etc/frr"],
                     "cap-add": ["NET_ADMIN", "NET_RAW", "SYS_ADMIN"],
                 },
                 "h1": {
@@ -55,13 +55,13 @@ class ValidateTopologyTest(unittest.TestCase):
     def test_good_topology_is_hardened(self) -> None:
         plan = validate_topology(good_topology(), IMAGES, LAB_DIR)
         self.assertEqual(plan.name, "bfx-t-demo")
-        self.assertEqual(plan.files, ["r1/frr.conf", "r1/daemons"])
+        self.assertEqual(plan.config_dirs, {"r1": "r1"})
         self.assertEqual(plan.roles, {"r1": "router", "h1": "host"})
         r1 = plan.topology["topology"]["nodes"]["r1"]
         self.assertEqual(r1["network-mode"], "none")
         self.assertIs(r1["privileged"], False)
         self.assertEqual(r1["restart-policy"], "no")
-        self.assertEqual(r1["binds"][0], f"{LAB_DIR}/files/r1/frr.conf:/etc/frr/frr.conf")
+        self.assertEqual(r1["binds"], [f"{LAB_DIR}/files/r1:/etc/frr"])
         self.assertEqual(r1["sysctls"]["net.ipv4.ip_forward"], "1")
         self.assertEqual(plan.topology["mgmt"], {"skip-when-unused": True})
         self.assertNotIn("sysctls", plan.topology["topology"]["nodes"]["h1"])
@@ -110,22 +110,32 @@ class ValidateTopologyTest(unittest.TestCase):
             self.assert_refused(doc, "not an allowed lab image")
 
     def test_refuses_dangerous_binds(self) -> None:
-        for bind in (
-            "/:/host",
-            "/etc/shadow:/etc/frr/frr.conf",
-            "../x:/etc/frr/frr.conf",
-            "r1/../../x:/etc/frr/frr.conf",
-            "r1/frr.conf:/etc/passwd",
-            "r1/frr.conf:/etc/frr/frr.conf:shared",
-            "/var/run/docker.sock:/var/run/docker.sock",
+        for binds in (
+            ["/:/host"],
+            ["/etc:/etc/frr"],
+            ["../x:/etc/frr"],
+            ["r1/../../x:/etc/frr"],
+            ["r1:/etc"],
+            ["r1:/etc/frr/frr.conf"],
+            ["r1:/etc/frr:shared"],
+            ["r1:/etc/frr:ro:z"],
+            ["/var/run/docker.sock:/var/run/docker.sock"],
+            ["r1:/etc/frr", "r2:/etc/frr"],
+            [],
         ):
-            doc = self.mutate(lambda d, b=bind: d["topology"]["nodes"]["r1"].update(binds=[b]))
-            with self.assertRaises(PolicyError, msg=bind):
+            doc = self.mutate(lambda d, b=binds: d["topology"]["nodes"]["r1"].update(binds=b))
+            with self.assertRaises(PolicyError, msg=str(binds)):
                 validate_topology(doc, IMAGES, LAB_DIR)
+
+    def test_refuses_two_routers_sharing_a_config_dir(self) -> None:
+        def add_r2(d: dict) -> None:
+            d["topology"]["nodes"]["r2"] = dict(d["topology"]["nodes"]["r1"])
+
+        self.assert_refused(self.mutate(add_r2), "used by another router")
 
     def test_refuses_binds_on_hosts_and_exec_on_routers(self) -> None:
         doc = self.mutate(
-            lambda d: d["topology"]["nodes"]["h1"].update(binds=["h1/x:/etc/frr/frr.conf"])
+            lambda d: d["topology"]["nodes"]["h1"].update(binds=["h1:/etc/frr"])
         )
         self.assert_refused(doc, "only routers")
         doc = self.mutate(lambda d: d["topology"]["nodes"]["r1"].update(exec=["ip link set eth1 up"]))
@@ -164,7 +174,7 @@ class ValidateTopologyTest(unittest.TestCase):
 
 def create_body(**hc_overrides) -> dict:  # type: ignore[no-untyped-def]
     hc = {
-        "Binds": [f"{LAB_DIR}/files/r1/frr.conf:/etc/frr/frr.conf"],
+        "Binds": [f"{LAB_DIR}/files/r1:/etc/frr"],
         "NetworkMode": "none",
         "CapAdd": ["NET_ADMIN", "SYS_ADMIN"],
         "Privileged": False,
@@ -220,9 +230,11 @@ class SanitizeCreateTest(unittest.TestCase):
             "devices": create_body(Devices=[{"PathOnHost": "/dev/sda"}]),
             "mounts": create_body(Mounts=[{"Source": "/", "Target": "/host"}]),
             "bind root": create_body(Binds=["/:/host"]),
-            "bind outside lab": create_body(Binds=[f"{LABS}/bfx-t-other/files/x:/etc/frr/frr.conf"]),
-            "bind traversal": create_body(Binds=[f"{LAB_DIR}/files/../../x:/etc/frr/frr.conf"]),
-            "bind target": create_body(Binds=[f"{LAB_DIR}/files/r1/frr.conf:/root/x"]),
+            "bind outside lab": create_body(Binds=[f"{LABS}/bfx-t-other/files/r1:/etc/frr"]),
+            "bind traversal": create_body(Binds=[f"{LAB_DIR}/files/../../x:/etc/frr"]),
+            "bind target": create_body(Binds=[f"{LAB_DIR}/files/r1:/root"]),
+            "two binds": create_body(Binds=[f"{LAB_DIR}/files/r1:/etc/frr", f"{LAB_DIR}/files/r2:/etc/frr"]),
+            "no bind": create_body(Binds=[]),
             "caps": create_body(CapAdd=["SYS_MODULE"]),
             "kernel sysctl": create_body(Sysctls={"kernel.core_pattern": "|/x"}),
             "cgroup parent": create_body(CgroupParent="/"),
@@ -270,7 +282,7 @@ class SanitizeCreateTest(unittest.TestCase):
         out, role = sanitize_create("clab-bfx-t-demo-h1", body, IMAGES, LABS)
         self.assertEqual(role, "host")
         self.assertEqual(out["HostConfig"]["PidsLimit"], 64)
-        body["HostConfig"]["Binds"] = [f"{LAB_DIR}/files/r1/frr.conf:/etc/frr/frr.conf"]
+        body["HostConfig"]["Binds"] = [f"{LAB_DIR}/files/r1:/etc/frr"]
         with self.assertRaises(PolicyError):
             sanitize_create("clab-bfx-t-demo-h1", body, IMAGES, LABS)
 
@@ -287,7 +299,7 @@ class SanitizeExecTest(unittest.TestCase):
             "router",
             {"Cmd": ["vtysh"], "Tty": True, "AttachStdin": True, "Env": ["VTYSH_PAGER=less"]},
         )
-        self.assertEqual(out["Env"], ["VTYSH_PAGER=cat"])
+        self.assertEqual(out["Env"], ["VTYSH_PAGER=cat", "TERM=xterm-256color"])
         self.assertTrue(out["AttachStdin"])
         self.assertIs(out["Privileged"], False)
 
@@ -295,6 +307,8 @@ class SanitizeExecTest(unittest.TestCase):
         sanitize_exec("router", {"Cmd": ["vtysh", "-c", "show ip route json"]})
         sanitize_exec("router", {"Cmd": ["vtysh", "-c", "show running-config"]})
         sanitize_exec("router", {"Cmd": ["vtysh", "-c", "show bgp neighbors 10.0.0.2 json"]})
+        batch = ["vtysh"] + ["-c", "show interface json"] * 8
+        self.assertEqual(sanitize_exec("router", {"Cmd": batch})["Env"], ["VTYSH_PAGER=cat"])
 
     def test_router_refusals(self) -> None:
         for cmd in (
@@ -307,6 +321,9 @@ class SanitizeExecTest(unittest.TestCase):
             ["vtysh", "-c", "show run; start-shell"],
             ["vtysh", "-c", "show run\nstart-shell"],
             ["vtysh", "-c", "show run", "-c", "start-shell"],
+            ["vtysh", "-c", "show run", "show run"],
+            ["vtysh"] + ["-c", "show run"] * 9,
+            ["vtysh", "-c", "show run", "-b"],
             ["vtysh", "-b"],
             ["vtysh", "--vty_socket", "/tmp"],
             ["ip", "addr"],

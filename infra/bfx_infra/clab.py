@@ -36,6 +36,8 @@ from .policy import (
     LAB_NAME_RE,
     MAX_CONFIG_BYTES,
     MAX_TOPOLOGY_BYTES,
+    ROUTER_CONFIG_FILES,
+    ROUTER_CONFIG_REQUIRED,
     ImagePolicy,
     PolicyError,
     validate_lab_name,
@@ -109,6 +111,27 @@ def read_regular_file(path: str, limit: int) -> bytes:
         return data
     finally:
         os.close(fd)
+
+
+def read_config_dir(src: str, rel_dir: str) -> dict[str, bytes]:
+    """Read a router's config files from src/rel_dir. The directory must be real, not a symlink."""
+    path = os.path.join(src, rel_dir)
+    try:
+        st = os.lstat(path)
+    except FileNotFoundError as exc:
+        raise PolicyError(f"config directory {rel_dir!r} does not exist") from exc
+    if not stat.S_ISDIR(st.st_mode):
+        raise PolicyError(f"config directory {rel_dir!r} is not a directory")
+    if os.path.realpath(path) != os.path.join(os.path.realpath(src), rel_dir):
+        raise PolicyError(f"config directory {rel_dir!r} leaves the lab directory")
+    files: dict[str, bytes] = {}
+    for name in ROUTER_CONFIG_FILES:
+        file_path = os.path.join(path, name)
+        if os.path.lexists(file_path):
+            files[name] = read_regular_file(file_path, MAX_CONFIG_BYTES)
+        elif name in ROUTER_CONFIG_REQUIRED:
+            raise PolicyError(f"{rel_dir}/{name} is missing")
+    return files
 
 
 def remap_ids() -> tuple[int, int]:
@@ -234,6 +257,28 @@ def destroy_lab(name: str) -> None:
         os.unlink(os.path.join(SSH_CONFIG_DIR, f"clab-{name}.conf"))
 
 
+def write_lab_files(lab_dir: str, topology: dict[str, Any], configs: dict[str, dict[str, bytes]]) -> None:
+    uid, gid = remap_ids()
+    os.makedirs(os.path.join(lab_dir, "files"), mode=0o711)
+    os.chmod(lab_dir, 0o711)
+    for rel, files in configs.items():
+        # The config dir belongs to the container's root so FRR can save (`write memory`).
+        dest_dir = os.path.join(lab_dir, "files", rel)
+        os.makedirs(os.path.dirname(dest_dir), mode=0o711, exist_ok=True)
+        os.mkdir(dest_dir, 0o755)
+        os.chown(dest_dir, uid, gid)
+        for fname, data in files.items():
+            dest = os.path.join(dest_dir, fname)
+            fd = os.open(dest, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o644)
+            with os.fdopen(fd, "wb") as fh:
+                fh.write(data)
+            os.chown(dest, uid, gid)
+    topo_path = os.path.join(lab_dir, "topology.clab.yml")
+    fd = os.open(topo_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        yaml.safe_dump(topology, fh, sort_keys=False)
+
+
 def cmd_deploy(src_arg: str) -> dict[str, Any]:
     src = os.path.realpath(src_arg)
     if not os.path.isdir(src):
@@ -246,29 +291,15 @@ def cmd_deploy(src_arg: str) -> dict[str, Any]:
     name = validate_lab_name(doc.get("name") if isinstance(doc, dict) else None)
     lab_dir = lab_dir_for(name)
     plan = validate_topology(doc, load_images(), lab_dir)
-    contents = {rel: read_regular_file(os.path.join(src, rel), MAX_CONFIG_BYTES) for rel in plan.files}
+    configs = {rel: read_config_dir(src, rel) for rel in plan.config_dirs.values()}
 
     with global_lock():
         if os.path.lexists(lab_dir) or lab_containers(name):
             raise PolicyError(f"lab {name} already exists")
         audit("deploy", f"lab={name} src={src}")
-        uid, gid = remap_ids()
-        os.makedirs(os.path.join(lab_dir, "files"), mode=0o711)
-        os.chmod(lab_dir, 0o711)
-        for rel, data in contents.items():
-            dest = os.path.join(lab_dir, "files", rel)
-            os.makedirs(os.path.dirname(dest), mode=0o711, exist_ok=True)
-            fd = os.open(dest, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o644)
-            with os.fdopen(fd, "wb") as fh:
-                fh.write(data)
-            os.chown(dest, uid, gid)
-        topo_path = os.path.join(lab_dir, "topology.clab.yml")
-        with open(topo_path, "w", encoding="utf-8") as fh:
-            yaml.safe_dump(plan.topology, fh, sort_keys=False)
-        os.chmod(topo_path, 0o600)
-
         try:
-            proc = run_containerlab(["deploy", "-t", topo_path, "--log-level", "warn"], lab_dir)
+            write_lab_files(lab_dir, plan.topology, configs)
+            proc = run_containerlab(["deploy", "-t", "topology.clab.yml", "--log-level", "warn"], lab_dir)
             if proc.returncode != 0:
                 tail = (proc.stderr or proc.stdout).strip().splitlines()[-15:]
                 raise Failure("containerlab deploy failed:\n" + "\n".join(tail))

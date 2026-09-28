@@ -84,10 +84,13 @@ def json_error(status: int, message: str) -> bytes:
 
 
 class Guard:
-    def __init__(self, docker_socket: str, images: ImagePolicy, labs_root: str) -> None:
+    def __init__(
+        self, docker_socket: str, images: ImagePolicy, labs_root: str, verbose: bool = False
+    ) -> None:
         self.docker_socket = docker_socket
         self.images = images
         self.labs_root = labs_root
+        self.verbose = verbose  # refusals and errors are always logged; allowed calls only if verbose
         self.execs: dict[str, tuple[float, str]] = {}
 
     # -- upstream helpers ------------------------------------------------------------------
@@ -161,7 +164,8 @@ class Guard:
                 status = await self.handle_app(req, path, query, reader, writer)
             else:
                 status = await self.handle_deploy(req, path, query, reader, writer)
-            log(profile=profile, method=req.method, path=path, status=status)
+            if self.verbose:
+                log(profile=profile, method=req.method, path=path, status=status)
         except EOFError:
             pass
         except PolicyError as exc:
@@ -322,7 +326,7 @@ def _prepare_socket_path(path: str) -> None:
 async def serve(args: argparse.Namespace) -> None:
     with open(args.images, encoding="utf-8") as fh:
         images = ImagePolicy.from_json(fh.read())
-    guard = Guard(args.docker_socket, images, args.labs_root)
+    guard = Guard(args.docker_socket, images, args.labs_root, verbose=args.verbose)
 
     _prepare_socket_path(args.app_socket)
     _prepare_socket_path(args.deploy_socket)
@@ -359,5 +363,6 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--images", default=IMAGES_FILE)
     parser.add_argument("--labs-root", default=LABS_ROOT)
     parser.add_argument("--app-group", default=APP_GROUP, help="empty string = leave group as is")
+    parser.add_argument("--verbose", action="store_true", help="also log allowed requests")
     asyncio.run(serve(parser.parse_args(argv)))
     return 0

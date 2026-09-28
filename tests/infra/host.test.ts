@@ -40,10 +40,17 @@ describe("host preparation (scripts/bootstrap.sh)", () => {
     if (line !== undefined) expect(line.split(":")[3]).toBe("");
   });
 
-  it("allows sudo for the wrapper only, never containerlab itself", () => {
-    expect(() => execFileSync("sudo", ["-n", "-l", CLAB_WRAPPER], { stdio: "pipe" })).not.toThrow();
-    expect(() => execFileSync("sudo", ["-n", "-l", "/usr/bin/containerlab"], { stdio: "pipe" })).toThrow();
-    expect(() => execFileSync("sudo", ["-n", "-l", "/usr/bin/docker"], { stdio: "pipe" })).toThrow();
+  it("gives passwordless root to the wrapper only", () => {
+    expect(() => execFileSync("sudo", ["-n", CLAB_WRAPPER, "list"], { stdio: "pipe" })).not.toThrow();
+    for (const cmd of [["/usr/bin/containerlab", "version"], ["/usr/bin/docker", "ps"], ["/bin/sh", "-c", "id"]]) {
+      let stderr = "";
+      try {
+        execFileSync("sudo", ["-n", ...cmd], { stdio: "pipe" });
+      } catch (err) {
+        stderr = String((err as { stderr?: Buffer }).stderr ?? "");
+      }
+      expect(stderr, cmd.join(" ")).toMatch(/password is required/);
+    }
   });
 
   it("pins both lab images by image ID", () => {

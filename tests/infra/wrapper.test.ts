@@ -21,10 +21,19 @@ const refusals: [string, Edit][] = [
       await symlink("/etc/shadow", join(dir, "r1/frr.conf"));
     },
   ],
+  [
+    "config directory that is a symlink to /etc",
+    async (_t, dir) => {
+      await rm(join(dir, "r1"), { recursive: true });
+      await symlink("/etc", join(dir, "r1"));
+    },
+  ],
+  ["bind of a single file instead of the config directory", (t) => void (r1(t).binds = ["r1/frr.conf:/etc/frr/frr.conf"])],
   ["image that is not pinned", (t) => void (r1(t).image = "alpine:3")],
   ["exec on a router", (t) => void (r1(t).exec = ["ip link set eth1 up"])],
   ["shell exec on a host", (t) => void (h1(t).exec = ["sh -c id"])],
   ["capability outside the allowlist", (t) => void (r1(t)["cap-add"] = ["SYS_MODULE"])],
+  ["capability FRR does not need", (t) => void (r1(t)["cap-add"] = ["FOWNER"])],
   ["custom entrypoint", (t) => void (r1(t).entrypoint = "/bin/sh")],
 ];
 

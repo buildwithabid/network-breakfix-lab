@@ -6,11 +6,9 @@ topology:
     r1:
       kind: linux
       image: quay.io/frrouting/frr:10.7.1
-      cap-add: [NET_ADMIN, NET_RAW, NET_BIND_SERVICE, SYS_ADMIN, SETUID, SETGID, CHOWN, DAC_OVERRIDE, FOWNER, KILL]
+      cap-add: [CHOWN, DAC_OVERRIDE, NET_ADMIN, NET_BIND_SERVICE, NET_RAW, SETGID, SETUID, SYS_ADMIN]
       binds:
-        - r1/daemons:/etc/frr/daemons
-        - r1/frr.conf:/etc/frr/frr.conf
-        - r1/vtysh.conf:/etc/frr/vtysh.conf
+        - r1:/etc/frr
     h1:
       kind: linux
       image: breakfix-host:0.1.0

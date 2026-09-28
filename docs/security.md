@@ -30,9 +30,9 @@ allowed to run containerlab with a file they wrote is root. So sudo allows only
 
 - accepts `deploy <dir>`, `destroy <bfx-name>`, `list`, nothing else;
 - validates the topology against an allowlist (`infra/bfx_infra/policy.py`): pinned images only, node
-  keys limited to `kind/image/binds/exec/cap-add`, binds only to `/etc/frr/{frr.conf,daemons,vtysh.conf}`,
+  keys limited to `kind/image/binds/exec/cap-add`, one bind per router and only of its config directory to `/etc/frr`,
   `exec` only on hosts and only `ip addr/link/route add` forms, capabilities within a per-role maximum;
-- copies only regular files (opened with `O_NOFOLLOW`, size-capped) into
+- copies only `frr.conf`, `daemons` and `vtysh.conf`, as regular files (opened with `O_NOFOLLOW`, size-capped, no symlinked directories), into
   `/var/lib/breakfix-clab/labs/<lab>/`, so containerlab never reads a path the caller controls;
 - writes the topology itself: `network-mode: none`, `privileged: false`, `restart-policy: no`,
   memory/CPU limits, router sysctls;
@@ -76,18 +76,23 @@ Tests: `infra/tests/test_policy.py`, `infra/tests/test_guard.py`, `infra/tests/t
 
 Docker's default set is dropped entirely. What is added back:
 
-| Capability | Role | Why |
+| Capability | Role | Why (measured on FRR 10.7.1: OSPF + BGP between two routers, then `write memory`) |
 |---|---|---|
-| `NET_ADMIN` | router, host | zebra programs addresses and routes; hosts get their address at deploy |
-| `NET_RAW` | router, host | OSPF uses raw IP sockets; ping and traceroute |
-| `NET_BIND_SERVICE` | router | bgpd listens on port 179 |
-| `SYS_ADMIN` | router | every FRR daemon asks for it at start-up and exits if it is missing (`lib/privs.c`, `zebra_capabilities_t _caps_p[]`); with userns-remap it only has meaning inside the container's own namespaces |
-| `SETUID`, `SETGID` | router | FRR daemons drop from root to the `frr` user |
-| `CHOWN`, `DAC_OVERRIDE`, `FOWNER` | router | the FRR entrypoint chowns `/etc/frr` and the run directories |
-| `KILL` | router | watchfrr signals the daemons it supervises |
+| `NET_ADMIN` | router, host | without it zebra, mgmtd, bgpd and ospfd die at start-up; hosts need it to get their address at deploy |
+| `NET_RAW` | router, host | without it zebra, mgmtd, bgpd and ospfd die (OSPF uses raw IP sockets); ping and traceroute on hosts |
+| `NET_BIND_SERVICE` | router | without it mgmtd, bgpd and ospfd die (bgpd listens on port 179) |
+| `SYS_ADMIN` | router | every FRR daemon asks for it at start-up and exits if it is missing (`lib/privs.c`); with userns-remap it only has meaning inside the container's own namespaces |
+| `SETUID`, `SETGID` | router | without them every daemon dies: FRR drops from root to the `frr` user |
+| `DAC_OVERRIDE` | router | without it the container stops during start-up |
+| `CHOWN` | router | without it `write memory` fails ("can't chown configuration file") |
 
-The router set is the upper bound checked by the guard. The M0 spike narrows it to what FRR 10.7.1
-actually needs, and this table is updated with the result.
+Measured as not needed and therefore not granted: `FOWNER`, `KILL`, and the rest of Docker's
+default set (`MKNOD`, `SYS_CHROOT`, `AUDIT_WRITE`, `SETFCAP`, `SETPCAP`, `FSETID`). The spike that
+measured this deployed the two-router lab once per capability with that capability removed.
+
+A router's whole `/etc/frr` is one directory in the lab, owned by the container's (remapped) root, and
+holding only `frr.conf`, `daemons` and optionally `vtysh.conf`. Mounting the directory rather than
+single files lets `write memory` rename and save its files like on a real router.
 
 ## Candidate access
 

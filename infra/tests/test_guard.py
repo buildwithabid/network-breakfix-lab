@@ -134,7 +134,7 @@ class GuardTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(status, 201)
         self.assertEqual(body["Id"], EXEC_ID)
         sent = self.forwarded("POST", f"/containers/{'c1' * 32}/exec")[0]
-        self.assertEqual(sent["Env"], ["VTYSH_PAGER=cat"])
+        self.assertEqual(sent["Env"], ["VTYSH_PAGER=cat", "TERM=xterm-256color"])
         self.assertEqual(sent["Cmd"], ["vtysh"])
 
     async def test_shell_exec_is_refused_and_never_reaches_docker(self) -> None:
@@ -207,7 +207,12 @@ class GuardTest(unittest.IsolatedAsyncioTestCase):
     # -- deploy profile -----------------------------------------------------------------------
 
     def create_body(self, **hc: Any) -> dict[str, Any]:
-        host_config = {"NetworkMode": "none", "CapAdd": ["NET_ADMIN"], **hc}
+        host_config = {
+            "NetworkMode": "none",
+            "CapAdd": ["NET_ADMIN"],
+            "Binds": [f"{LABS}/bfx-t-demo/files/r1:/etc/frr"],
+            **hc,
+        }
         return {
             "Image": FRR,
             "Labels": {"containerlab": "bfx-t-demo", "clab-node-name": "r1"},

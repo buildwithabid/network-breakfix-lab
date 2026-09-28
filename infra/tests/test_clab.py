@@ -50,6 +50,46 @@ class ReadRegularFileTest(unittest.TestCase):
             clab.read_regular_file(big, 100)
 
 
+class ReadConfigDirTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.src = os.path.realpath(self.tmp.name)
+        os.mkdir(os.path.join(self.src, "r1"))
+        for name in ("frr.conf", "daemons"):
+            with open(os.path.join(self.src, "r1", name), "w", encoding="utf-8") as fh:
+                fh.write(name)
+
+    def tearDown(self) -> None:
+        self.tmp.cleanup()
+
+    def test_reads_the_allowed_files_only(self) -> None:
+        with open(os.path.join(self.src, "r1", "extra.sh"), "w", encoding="utf-8") as fh:
+            fh.write("#!/bin/sh")
+        files = clab.read_config_dir(self.src, "r1")
+        self.assertEqual(sorted(files), ["daemons", "frr.conf"])
+
+    def test_requires_frr_conf_and_daemons(self) -> None:
+        os.unlink(os.path.join(self.src, "r1", "daemons"))
+        with self.assertRaises(PolicyError):
+            clab.read_config_dir(self.src, "r1")
+
+    def test_refuses_symlinked_dirs_and_files(self) -> None:
+        os.symlink("/etc", os.path.join(self.src, "r2"))
+        with self.assertRaises(PolicyError):
+            clab.read_config_dir(self.src, "r2")
+        os.unlink(os.path.join(self.src, "r1", "frr.conf"))
+        os.symlink("/etc/passwd", os.path.join(self.src, "r1", "frr.conf"))
+        with self.assertRaises(PolicyError):
+            clab.read_config_dir(self.src, "r1")
+
+    def test_refuses_a_path_through_a_symlinked_parent(self) -> None:
+        os.mkdir(os.path.join(self.src, "real"))
+        os.mkdir(os.path.join(self.src, "real", "r9"))
+        os.symlink(os.path.join(self.src, "real"), os.path.join(self.src, "cfg"))
+        with self.assertRaises(PolicyError):
+            clab.read_config_dir(self.src, "cfg/r9")
+
+
 class LabDirTest(unittest.TestCase):
     def test_lab_dir_stays_under_the_labs_root(self) -> None:
         self.assertEqual(clab.lab_dir_for("bfx-t-a1"), f"{clab.LABS_ROOT}/bfx-t-a1")
