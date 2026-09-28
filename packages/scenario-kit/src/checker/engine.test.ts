@@ -34,4 +34,20 @@ describe("checkObjectives", () => {
     const results = await checkObjectives(objectives, runner);
     expect(results.every((r) => !r.passed && r.detail.includes("docker-guard: 403"))).toBe(true);
   });
+
+  it("negates a rule, but never turns an unreadable node into a pass", async () => {
+    const [leak] = [
+      { id: "no-leak", description: "mgmt stays private", negate: true, rule: { type: "prefix-received", router: "r2", peer: "10.0.12.1", prefix: "192.168.99.1/32" } },
+    ].map((o) => Objective.parse(o));
+    const absent: ProbeRunner = { run: () => Promise.resolve({ exitCode: 0, stdout: "{}", stderr: "" }) };
+    const present: ProbeRunner = {
+      run: () => Promise.resolve({ exitCode: 0, stderr: "", stdout: JSON.stringify({ paths: [{ valid: true, peer: { peerId: "10.0.12.1" } }] }) }),
+    };
+    const down: ProbeRunner = { run: () => Promise.resolve({ exitCode: 1, stdout: "% bgpd is not running", stderr: "" }) };
+    const objectives = leak ? [leak] : [];
+    expect((await checkObjectives(objectives, absent))[0]).toMatchObject({ passed: true, detail: "must not hold: r2: 192.168.99.1/32 from 10.0.12.1: not received" });
+    expect((await checkObjectives(objectives, present))[0]?.passed).toBe(false);
+    expect((await checkObjectives(objectives, down))[0]?.passed).toBe(false);
+    expect((await checkObjectives(objectives, { run: () => Promise.reject(new Error("x")) }))[0]?.passed).toBe(false);
+  });
 });

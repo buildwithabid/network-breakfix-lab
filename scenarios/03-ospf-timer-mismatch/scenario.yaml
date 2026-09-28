@@ -1,0 +1,26 @@
+id: 03-ospf-timer-mismatch
+title: The data centre fell off the map
+difficulty: medium
+timeLimitMinutes: 25
+ticket: |
+  After maintenance on the core router r2, the branch (10.0.1.0/24) lost access to the data
+  centre server at 10.0.3.10. Every link is up, and each router can ping its direct neighbours.
+
+  All routing in this network is OSPF area 0. Static routes are not allowed.
+objectives:
+  - id: branch-to-dc
+    description: Branch host h1 can reach the data centre server at 10.0.3.10
+    rule: { type: reachability, from: h1, to: 10.0.3.10 }
+  - id: dc-to-branch
+    description: The data centre server can reach branch host h1 at 10.0.1.10
+    rule: { type: reachability, from: srv, to: 10.0.1.10 }
+  - id: r2-r3-adjacency
+    description: r2 and r3 are fully adjacent in OSPF
+    rule: { type: ospf-neighbor, router: r2, neighbor: 3.3.3.3, state: Full }
+  - id: r1-learns-dc-via-ospf
+    description: r1 learns the data centre LAN 10.0.3.0/24 through OSPF
+    rule: { type: route-present, router: r1, prefix: 10.0.3.0/24, protocol: ospf }
+hints:
+  - "Which adjacencies are up? Run `show ip ospf neighbor` on every router."
+  - Neighbours must agree on some interface settings before they become adjacent.
+  - "Compare `show ip ospf interface eth2` on r2 with `show ip ospf interface eth1` on r3."

@@ -1,0 +1,30 @@
+id: 04-bgp-wrong-remote-as
+title: The new customer site is dark
+difficulty: medium
+timeLimitMinutes: 25
+ticket: |
+  A new customer site (router r1, AS 65010) was connected to our network (router r2, AS 65020)
+  today. The customer says nothing works: their LAN 10.0.1.0/24 can't reach our service at
+  198.51.100.10.
+
+  Routes between the customer and us must be exchanged over eBGP. No static routes.
+objectives:
+  - id: customer-to-service
+    description: Customer host h1 can reach the service at 198.51.100.10
+    rule: { type: reachability, from: h1, to: 198.51.100.10 }
+  - id: service-to-customer
+    description: The service host can reach customer host h1 at 10.0.1.10
+    rule: { type: reachability, from: srv, to: 10.0.1.10 }
+  - id: bgp-established
+    description: The eBGP session between r1 and r2 is established
+    rule: { type: bgp-session, router: r1, peer: 10.0.12.2 }
+  - id: customer-learns-service
+    description: r1 learns 198.51.100.0/24 from r2 over BGP
+    rule: { type: prefix-received, router: r1, peer: 10.0.12.2, prefix: 198.51.100.0/24 }
+  - id: provider-learns-customer
+    description: r2 learns the customer LAN 10.0.1.0/24 from r1 over BGP
+    rule: { type: prefix-received, router: r2, peer: 10.0.12.1, prefix: 10.0.1.0/24 }
+hints:
+  - "`show bgp summary` on both routers: what state is the session in?"
+  - Each BGP speaker checks that its neighbour is who it expects.
+  - "`show bgp neighbors 10.0.12.2` on r1 shows the last error it saw."

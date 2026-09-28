@@ -1,5 +1,5 @@
 import type { Objective } from "../schema.js";
-import { type Probe, type ProbeOutput, evaluate, probeFor, probeKey } from "./rules.js";
+import { type Probe, type ProbeOutput, type Verdict, evaluate, probeFor, probeKey } from "./rules.js";
 
 export interface ProbeRunner {
   run(probe: Probe): Promise<ProbeOutput>;
@@ -34,10 +34,12 @@ export async function checkObjectives(objectives: Objective[], runner: ProbeRunn
   return objectives.map((o) => {
     const probe = probeFor(o.rule);
     const out = outputs.get(probeKey(probe));
-    const verdict =
+    const verdict: Verdict =
       out === undefined || out instanceof Error
-        ? { passed: false, detail: `could not run the check: ${out?.message ?? "no output"}` }
+        ? { passed: false, detail: `could not run the check: ${out?.message ?? "no output"}`, indeterminate: true }
         : evaluate(o.rule, out);
-    return { id: o.id, description: o.description, probe, ...verdict };
+    const passed = o.negate && !verdict.indeterminate ? !verdict.passed : verdict.passed;
+    const detail = o.negate ? `must not hold: ${verdict.detail}` : verdict.detail;
+    return { id: o.id, description: o.description, passed, detail, probe };
   });
 }

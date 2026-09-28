@@ -65,6 +65,8 @@ export const Objective = z
     id: Slug,
     description: z.string().min(5).max(200),
     rule: Rule,
+    /** Pass when the rule does NOT hold, e.g. a prefix that must stay filtered. */
+    negate: z.boolean().default(false),
   })
   .strict();
 export type Objective = z.infer<typeof Objective>;

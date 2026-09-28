@@ -1,0 +1,28 @@
+id: 05-prefix-list-filter
+title: The sales office is invisible to HQ
+difficulty: hard
+timeLimitMinutes: 30
+ticket: |
+  The new sales office LAN (10.0.5.0/24) went live on r1 this morning. Sales staff can't reach the
+  HQ server at 10.0.2.10, and HQ can't reach them. The main office LAN 10.0.1.0/24 works fine.
+
+  Security policy: r1 advertises only its office LANs to HQ. Its outbound route filter must stay
+  in place.
+objectives:
+  - id: hq-to-sales
+    description: The HQ server can reach sales host h5 at 10.0.5.10
+    rule: { type: reachability, from: srv, to: 10.0.5.10 }
+  - id: hq-to-office
+    description: The HQ server can still reach office host h1 at 10.0.1.10
+    rule: { type: reachability, from: srv, to: 10.0.1.10 }
+  - id: hq-learns-sales
+    description: r2 learns the sales LAN 10.0.5.0/24 from r1 over BGP
+    rule: { type: prefix-received, router: r2, peer: 10.0.12.1, prefix: 10.0.5.0/24 }
+  - id: management-stays-private
+    description: r1's management address 192.168.99.1/32 is not advertised to HQ
+    negate: true
+    rule: { type: prefix-received, router: r2, peer: 10.0.12.1, prefix: 192.168.99.1/32 }
+hints:
+  - "Does r2 know 10.0.5.0/24 at all? Check `show bgp ipv4 unicast` on r2."
+  - "Is r1 advertising it? `show bgp ipv4 unicast neighbors 10.0.12.2 advertised-routes` on r1."
+  - Outbound policy is applied per neighbour. Look for a filter on that neighbour.

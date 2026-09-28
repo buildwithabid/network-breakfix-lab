@@ -1,0 +1,24 @@
+id: 02-missing-default-route
+title: The branch has no way out
+difficulty: easy
+timeLimitMinutes: 20
+ticket: |
+  Branch users (10.0.1.0/24) can't reach anything outside their own LAN: not the HQ server at
+  10.0.2.10, and not the partner web server at 203.0.113.10. HQ reports no problems.
+
+  Design standard: a branch router sends all non-local traffic to the HQ router r2 with a single
+  default route. Branch routers carry no other static routes.
+objectives:
+  - id: branch-to-hq
+    description: Branch host h1 can reach the HQ server at 10.0.2.10
+    rule: { type: reachability, from: h1, to: 10.0.2.10 }
+  - id: branch-to-web
+    description: Branch host h1 can reach the partner web server at 203.0.113.10
+    rule: { type: reachability, from: h1, to: 203.0.113.10 }
+  - id: r1-default-route
+    description: r1 sends non-local traffic to r2 (10.0.12.2) with a default route
+    rule: { type: route-present, router: r1, prefix: 0.0.0.0/0, protocol: static, nexthop: 10.0.12.2 }
+hints:
+  - Can r1 ping r2? If it can, the link is fine. Look at what r1 knows.
+  - "`show ip route` on r1: where would a packet to 10.0.2.10 go?"
+  - The design standard asks for one route, not one route per destination.

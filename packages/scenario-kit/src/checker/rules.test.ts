@@ -115,6 +115,6 @@ describe("probes", () => {
   });
   it("broken or empty output fails with a readable reason", () => {
     const v = evaluate(rule({ type: "bgp-session", router: "r1", peer: "10.0.0.1" }), { exitCode: 1, stdout: "% bgpd is not running", stderr: "" });
-    expect(v).toEqual({ passed: false, detail: "r1 did not answer (routing daemons down?)" });
+    expect(v).toEqual({ passed: false, detail: "r1 did not answer (routing daemons down?)", indeterminate: true });
   });
 });

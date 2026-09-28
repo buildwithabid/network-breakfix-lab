@@ -1,6 +1,6 @@
 # Plan
 
-Status: **M1 done (28 Sep 2026).** Next: M2, scenarios 02–05.
+Status: **M2 done (28 Sep 2026).** Next: M3, the server.
 
 ## Decisions and brief issues
 
@@ -26,6 +26,7 @@ Status: **M1 done (28 Sep 2026).** Next: M2, scenarios 02–05.
 | B17 | The brief says baseline/ holds "working configs for every node". | Routers only. Hosts are configured by allowlisted `exec` lines in `topology.clab.yml` (address, default route), which are the same in every variant. The brief's five faults are all router faults. |
 | B18 | Self-test semantics for B9's workaround | A workaround must restore every `reachability` objective **and** still fail another one, in two checks 5 s apart. "At least one fails" alone would also pass a workaround fixture that doesn't work. |
 | B19 | `route-present (router, prefix, required protocol)` | An optional `nexthop` was added. Scenario 01 needs it to tell "r2 routes back via r1" from a route that merely exists. |
+| B20 | Scenario 05's shortcut is deleting the filter, and none of the brief's five rule types can express "must not be received". | Objectives take an optional `negate: true`. An unreadable node (crashed daemon, failed probe) never passes a negated objective. |
 | B15 | B6 (internet access) | **Resolved from the source:** with `network-mode: none` on every node and `mgmt.skip-when-unused: true`, containerlab creates no management network and does not edit `/etc/hosts`. Nodes have only lab links. No firewall rule needed; a test proves no outbound path. |
 
 ## Pinned versions (checked 28 Sep 2026; digests recorded in M0)
@@ -72,11 +73,11 @@ Each milestone ends with its tests green, docs updated and a commit.
 - [x] `docs/scenarios.md` (authoring guide).
 
 ### M2: Scenarios 2–5
-- [ ] 02 missing static/default route
-- [ ] 03 OSPF adjacency not forming (area or hello/dead mismatch); workaround = static route must fail
-- [ ] 04 BGP session down (wrong neighbour address or remote-as)
-- [ ] 05 prefix-list silently filtering a route that should be advertised; workaround = removing the policy entirely must fail
-- [ ] `pnpm scenario:test --all` green
+- [x] 02 missing default route (workaround: per-destination static routes)
+- [x] 03 OSPF hello/dead timer mismatch (workaround: static routes on all routers)
+- [x] 04 BGP session down, wrong remote-as (workaround: static routes)
+- [x] 05 prefix-list silently filtering the new LAN (workaround: removing the filter leaks the management /32; caught by a negated objective, B20)
+- [x] `pnpm scenario:test --all` green: 5/5, every workaround caught
 
 ### M3: Server
 - [ ] SQLite schema + migrations: tests, sessions, events (per-device command log), config snapshots, objective results. It also exports a versioned "assessment bundle" JSON per session so an AI assessment step can be added later (no AI now).

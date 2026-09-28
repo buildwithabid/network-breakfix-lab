@@ -14,6 +14,8 @@ export interface ProbeOutput {
 export interface Verdict {
   passed: boolean;
   detail: string;
+  /** The node could not be read at all. Negation must never turn this into a pass. */
+  indeterminate?: boolean;
 }
 
 export function probeKey(probe: Probe): string {
@@ -62,7 +64,7 @@ function parseJson<T>(out: ProbeOutput): T | undefined {
 }
 
 function unreadable(node: string): Verdict {
-  return { passed: false, detail: `${node} did not answer (routing daemons down?)` };
+  return { passed: false, detail: `${node} did not answer (routing daemons down?)`, indeterminate: true };
 }
 
 export function evaluate(rule: Rule, out: ProbeOutput): Verdict {

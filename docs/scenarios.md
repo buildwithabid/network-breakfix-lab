@@ -50,10 +50,22 @@ Each objective is one rule, checked with one read-only command on one node:
 
 `protocol` is one of `connected`, `static`, `ospf`, `bgp`, `kernel`, `local`.
 
+Add `negate: true` to an objective that must **not** hold, e.g. a prefix that has to stay filtered
+(scenario 05). If the node can't be read at all (a crashed daemon, a failed command), a negated
+objective still fails: an unreadable router never counts as "the prefix is absent".
+
 **Check the intended fix, not just reachability.** Pair the reachability objectives with at least
 one objective that only the real fix satisfies: the OSPF adjacency, the corrected subnet, the BGP
 session, the prefix learned from the right peer. For example, a static route that papers over broken
 OSPF restores pings, but fails `route-present … protocol: ospf`.
+
+| Scenario | Fault | Workaround the checks reject |
+|---|---|---|
+| 01-wrong-ip-mask | r2's transit interface is /31 instead of /30 | a host route to the next hop |
+| 02-missing-default-route | r1 has no default route | one static route per destination |
+| 03-ospf-timer-mismatch | hello/dead timers differ on r2–r3 | static routes on all three routers |
+| 04-bgp-wrong-remote-as | r1 expects AS 65002, r2 is AS 65020 | static routes instead of BGP |
+| 05-prefix-list-filter | the outbound prefix-list lacks the new LAN | removing the filter (leaks the management address) |
 
 ## Self-test
 

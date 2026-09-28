@@ -6,8 +6,8 @@ the fault in real router CLIs in the browser. Routers are [FRRouting](https://fr
 containers and hosts are small Linux containers, wired by [containerlab](https://containerlab.dev).
 On submit, a checker verifies the network was fixed the intended way.
 
-> **Status:** M1 done: scenario kit, checker and scenario 01, self-tested on real FRR labs.
-> Next: scenarios 02–05 (M2). See [PLAN.md](PLAN.md).
+> **Status:** M2 done: five CCNA-level scenarios, each self-tested on real FRR labs (baseline passes,
+> fault fails, a tempting workaround is still caught). Next: the server (M3). See [PLAN.md](PLAN.md).
 
 ## Why it is built this way
 
