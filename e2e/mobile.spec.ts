@@ -19,5 +19,6 @@ test("the test is usable at phone width", async ({ page }) => {
   await page.getByTestId("submit").click();
   await page.getByTestId("confirm-submit").click();
   await expect(page).toHaveURL(/\/results$/, { timeout: 120_000 });
+  await expect(page.getByTestId("score")).toBeVisible();
   await page.screenshot({ path: "screenshots/mobile-3-results.png", fullPage: true });
 });

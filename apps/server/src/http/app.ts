@@ -142,8 +142,11 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   });
 
   app.get("/api/session/ws", { websocket: true }, (socket, req) => {
+    // Same-origin check (blocks cross-site WebSocket hijacking). The page may be reached as
+    // PUBLIC_URL or through another address of this server, e.g. an SSH tunnel to localhost.
     const origin = req.headers.origin;
-    if (origin && origin !== new URL(config.PUBLIC_URL).origin) {
+    const sameHost = origin !== undefined && URL.canParse(origin) && new URL(origin).host === req.headers.host;
+    if (origin && origin !== new URL(config.PUBLIC_URL).origin && !sameHost) {
       socket.close(1008, "origin not allowed");
       return;
     }

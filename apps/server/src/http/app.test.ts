@@ -157,6 +157,15 @@ describe("WebSocket", () => {
     expect(await open({ cookie: header, origin: "https://evil.example" }).closed).toBe(1008);
   });
 
+  it("accepts the page's own origin, e.g. through an SSH tunnel", async () => {
+    const { open, header } = await connect();
+    const c = open({ cookie: header, origin: "http://localhost:8480", host: "localhost:8480" });
+    await new Promise((r) => c.ws.on("open", r));
+    await new Promise((r) => setTimeout(r, 100));
+    expect(c.messages.some((m) => m.t === "session")).toBe(true);
+    c.ws.close();
+  });
+
   it("closes on malformed messages", async () => {
     const { open, header } = await connect();
     const c = open({ cookie: header, origin: "http://lab.test" });
