@@ -6,7 +6,8 @@ the fault in real router CLIs in the browser. Routers are [FRRouting](https://fr
 containers and hosts are small Linux containers, wired by [containerlab](https://containerlab.dev).
 On submit, a checker verifies the network was fixed the intended way.
 
-> **Status:** milestone M0 (host bootstrap and privilege separation). See [PLAN.md](PLAN.md).
+> **Status:** M0 done: host bootstrap and privilege separation, verified against real FRR labs.
+> Next: the scenario kit (M1). See [PLAN.md](PLAN.md).
 
 ## Why it is built this way
 

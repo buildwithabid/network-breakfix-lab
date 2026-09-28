@@ -1,6 +1,6 @@
 # Plan
 
-Status: **M0 in progress.** Plan approved 28 Sep 2026. Code for M0 written and unit-tested; waiting for the owner to run `sudo scripts/bootstrap.sh`, then the spike and the infra tests.
+Status: **M0 done (28 Sep 2026).** Next: M1, the scenario kit and scenario 01.
 
 ## Decisions and brief issues
 
@@ -55,9 +55,9 @@ Each milestone ends with its tests green, docs updated and a commit.
 - [x] `scripts/dev-tools.sh` (pinned gitleaks + shellcheck) and a gitleaks pre-push hook.
 - [x] Owner runs `sudo scripts/bootstrap.sh` (28 Sep).
 - [x] Spike: FRR 10.7.1 runs unprivileged under userns-remap with `CapDrop=ALL`; vtysh works through the guard; no route to the internet. Router caps measured with a two-router OSPF + BGP lab, removing one cap per run: 8 needed, `FOWNER` and `KILL` dropped (docs/security.md).
-- [ ] Owner re-runs `sudo scripts/bootstrap.sh` to install the tightened policy (8 router caps, `/etc/frr` directory bind, `TERM` for interactive vtysh, batched `show` commands, quieter guard log).
-- [ ] Infra tests green (`pnpm test:infra`): host preparation, wrapper refusals, lab hardening, no internet.
-- [ ] Public repo `buildwithabid/network-breakfix-lab` created and pushed (gitleaks clean).
+- [x] Owner re-ran `sudo scripts/bootstrap.sh` to install the tightened policy: 8 router caps, `/etc/frr` directory bind, `TERM` for interactive vtysh, batched `show` commands, quieter guard log. Caps re-measured with the directory bind: all 8 still needed.
+- [x] Infra tests green (`pnpm test:infra`, 30 tests): host preparation, 14 wrapper refusals, lab hardening, `write memory`, wiring, no internet.
+- [x] Public repo `buildwithabid/network-breakfix-lab` created and pushed (gitleaks clean).
 
 ### M1: Scenario kit + scenario 1 end to end (CLI)
 - [ ] zod schema for `scenario.yaml` (id, title, difficulty, time limit, ticket, objectives, hints). The loader checks that every node in the topology has baseline and fault configs.
