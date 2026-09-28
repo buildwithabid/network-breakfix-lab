@@ -1,0 +1,26 @@
+id: 01-wrong-ip-mask
+title: Branch cannot reach the file server
+difficulty: easy
+timeLimitMinutes: 20
+ticket: |
+  Since last night's change window on r2, users at the branch office (10.0.1.0/24) can no longer
+  reach the file server at 10.0.3.10. Nothing else was changed.
+
+  The IP plan lists the r1–r2 transit link as 10.0.12.0/30. Find the fault and fix it properly.
+objectives:
+  - id: branch-to-server
+    description: Branch host h1 can reach the file server at 10.0.3.10
+    rule: { type: reachability, from: h1, to: 10.0.3.10 }
+  - id: server-to-branch
+    description: The file server can reach branch host h1 at 10.0.1.10
+    rule: { type: reachability, from: srv, to: 10.0.1.10 }
+  - id: r2-transit-per-plan
+    description: r2's transit link is addressed per the IP plan (10.0.12.0/30)
+    rule: { type: route-present, router: r2, prefix: 10.0.12.0/30, protocol: connected }
+  - id: r2-return-route
+    description: r2 reaches the branch LAN through its static route via r1 (10.0.12.1)
+    rule: { type: route-present, router: r2, prefix: 10.0.1.0/24, protocol: static, nexthop: 10.0.12.1 }
+hints:
+  - Start with the router that was changed. Compare its interface addresses with the IP plan.
+  - "`show ip route` shows which routes a router can actually use. Why would a next hop be unusable?"
+  - A /30 and a /31 look almost the same in a config.

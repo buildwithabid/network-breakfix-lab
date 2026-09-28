@@ -17,7 +17,8 @@
     "test": "vitest run --project unit",
     "test:helpers": "python3 -m unittest discover -s infra/tests -t infra",
     "test:infra": "vitest run --project infra",
-    "check": "pnpm typecheck && pnpm lint && pnpm lint:sh && pnpm test && pnpm test:helpers"
+    "check": "pnpm typecheck && pnpm lint && pnpm lint:sh && pnpm test && pnpm test:helpers",
+    "scenario:test": "pnpm --silent --filter @breakfix/scenario-kit run build && node packages/scenario-kit/dist/cli.js test"
   },
   "devDependencies": {
     "@breakfix/scenario-kit": "workspace:*",

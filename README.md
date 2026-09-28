@@ -6,8 +6,8 @@ the fault in real router CLIs in the browser. Routers are [FRRouting](https://fr
 containers and hosts are small Linux containers, wired by [containerlab](https://containerlab.dev).
 On submit, a checker verifies the network was fixed the intended way.
 
-> **Status:** M0 done: host bootstrap and privilege separation, verified against real FRR labs.
-> Next: the scenario kit (M1). See [PLAN.md](PLAN.md).
+> **Status:** M1 done: scenario kit, checker and scenario 01, self-tested on real FRR labs.
+> Next: scenarios 02–05 (M2). See [PLAN.md](PLAN.md).
 
 ## Why it is built this way
 
@@ -32,8 +32,11 @@ sudo scripts/bootstrap.sh     # Debian 13: Docker, containerlab, images, guard, 
 scripts/dev-tools.sh
 pnpm install
 pnpm check                    # lint, typecheck, unit + helper tests
-pnpm test:infra               # deploys a real lab and verifies its hardening
+pnpm test:infra               # deploys real labs: hardening checks and scenario self-tests
+pnpm scenario:test --all      # self-test every scenario: baseline passes, fault fails, workaround is caught
 ```
+
+Writing a scenario: [docs/scenarios.md](docs/scenarios.md).
 
 ## Layout
 
@@ -41,8 +44,8 @@ pnpm test:infra               # deploys a real lab and verifies its hardening
 |---|---|
 | `apps/server` | Fastify API, WebSocket terminals, lab lifecycle (M3) |
 | `apps/web` | React UI: ticket, live topology, terminals, results (M4) |
-| `packages/scenario-kit` | scenario schema, loader, lab runner, checker (M1) |
-| `scenarios/` | one folder per scenario (M1–M2) |
+| `packages/scenario-kit` | scenario schema, loader, renderer, checker, lab runner, `scenario:test` CLI |
+| `scenarios/` | one folder per scenario |
 | `infra/` | root-side helpers (`breakfix-clab`, `docker-guard`), systemd units, host image |
 | `scripts/` | `bootstrap.sh`, `dev-tools.sh`, pinned `versions.env` |
 | `tests/infra` | tests that need a bootstrapped host |

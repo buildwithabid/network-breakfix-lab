@@ -1,6 +1,6 @@
 # Plan
 
-Status: **M0 done (28 Sep 2026).** Next: M1, the scenario kit and scenario 01.
+Status: **M1 done (28 Sep 2026).** Next: M2, scenarios 02–05.
 
 ## Decisions and brief issues
 
@@ -23,6 +23,9 @@ Status: **M0 done (28 Sep 2026).** Next: M1, the scenario kit and scenario 01.
 | B13 | FRR needs `SYS_ADMIN` (R2). | Granted to routers only, and contained: Docker `userns-remap` (container root = unprivileged host UID), `no-new-privileges`, default seccomp + AppArmor never overridden, no network egress, vtysh-only access. Documented in docs/security.md. |
 | B14 | containerlab has no `cap-drop` option, and its `.deb` makes the binary setuid root for a `clab_admins` group. | The guard's deploy socket rewrites every container create (`CapDrop=ALL` + the role's caps), and containerlab talks to Docker only through it. Bootstrap removes the setuid bit and empties `clab_admins`. |
 | B16 | Spike finding: binding `frr.conf` as a single file makes `write memory` print "Error renaming … Resource busy". | Each router's whole `/etc/frr` is one lab directory (owned by the container's remapped root) holding only `frr.conf`, `daemons`, `vtysh.conf`. `write memory` saves cleanly; a test checks it. |
+| B17 | The brief says baseline/ holds "working configs for every node". | Routers only. Hosts are configured by allowlisted `exec` lines in `topology.clab.yml` (address, default route), which are the same in every variant. The brief's five faults are all router faults. |
+| B18 | Self-test semantics for B9's workaround | A workaround must restore every `reachability` objective **and** still fail another one, in two checks 5 s apart. "At least one fails" alone would also pass a workaround fixture that doesn't work. |
+| B19 | `route-present (router, prefix, required protocol)` | An optional `nexthop` was added. Scenario 01 needs it to tell "r2 routes back via r1" from a route that merely exists. |
 | B15 | B6 (internet access) | **Resolved from the source:** with `network-mode: none` on every node and `mgmt.skip-when-unused: true`, containerlab creates no management network and does not edit `/etc/hosts`. Nodes have only lab links. No firewall rule needed; a test proves no outbound path. |
 
 ## Pinned versions (checked 28 Sep 2026; digests recorded in M0)
@@ -60,12 +63,13 @@ Each milestone ends with its tests green, docs updated and a commit.
 - [x] Public repo `buildwithabid/network-breakfix-lab` created and pushed (gitleaks clean).
 
 ### M1: Scenario kit + scenario 1 end to end (CLI)
-- [ ] zod schema for `scenario.yaml` (id, title, difficulty, time limit, ticket, objectives, hints). The loader checks that every node in the topology has baseline and fault configs.
-- [ ] Topology renderer: scenario + variant (baseline | fault | workaround) → lab dir with a unique `bfx-` lab name.
-- [ ] Checker engine, pure and unit-tested against JSON fixtures captured from FRR 10.7.1. Rule types: `reachability` (host → IP), `route-present` (router, prefix, required protocol), `ospf-neighbor` (state), `bgp-session` (state), `prefix-received`.
-- [ ] Lab runner in scenario-kit: deploy, wait-ready, exec, destroy, always cleaned up (also on Ctrl-C and on failure).
-- [ ] `pnpm scenario:test <id>` and `--all`: baseline → all pass; fault → at least one fails; workaround (if present) → at least one fails.
-- [ ] Scenario 01: wrong IP or mask on a router interface. Integration test runs its self-test.
+- [x] zod schema for `scenario.yaml` (id, title, difficulty, time limit, ticket, objectives, hints) and the allowed subset of `topology.clab.yml`. The loader cross-checks roles, rule nodes, links and variant dirs, and reports every problem at once.
+- [x] Renderer: scenario + variant (baseline | fault | workaround) → lab dir with a unique `bfx-t-*` name, the `/etc/frr` bind and the measured caps.
+- [x] Checker engine: pure, with deduplicated probes. Unit-tested against real JSON captured from FRR 10.7.1 (healthy and broken OSPF/BGP). Rule types: `reachability`, `route-present`, `ospf-neighbor`, `bgp-session`, `prefix-received`.
+- [x] Lab runner: deploy through `breakfix-clab`, exec through `docker-guard`, wait for routers, destroy. Active labs are destroyed on SIGINT/SIGTERM and on failure.
+- [x] `pnpm scenario:test <id>` and `--all` (B18 semantics). Variants run in parallel.
+- [x] Scenario 01 (wrong mask on r2's transit link; the workaround host route is caught). Self-test green on real labs (baseline 9 s, fault 36 s); also runs in `pnpm test:infra`.
+- [x] `docs/scenarios.md` (authoring guide).
 
 ### M2: Scenarios 2–5
 - [ ] 02 missing static/default route

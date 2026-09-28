@@ -40,7 +40,7 @@ TypeScript (strict) everywhere except the two root-side helpers (PLAN.md B11), p
 | `apps/server` | Fastify + ws, dockerode (through `docker-guard`), containerlab (through `breakfix-clab`), better-sqlite3, zod, pino, `@xterm/headless` for command capture |
 | `apps/web` | Vite + React, xterm.js terminals, SVG topology rendered from scenario data |
 | `packages/scenario-kit` | scenario schema (zod), loader, topology renderer, checker engine, `scenario:test` CLI |
-| `scenarios/<id>/` | `scenario.yaml`, `topology.clab.yml`, `baseline/`, `fault/`, `workaround/` |
+| `scenarios/<id>/` | `scenario.yaml`, `topology.clab.yml`, `baseline/`, `fault/`, `workaround/` (format: docs/scenarios.md) |
 | `infra/` | root-side helpers in stdlib Python (`bfx_infra`: `breakfix-clab` wrapper, `docker-guard` proxy), systemd units, host image |
 | `scripts/` | `bootstrap.sh` (root, idempotent), `dev-tools.sh`, pinned `versions.env` |
 | `tests/infra/` | Vitest tests that need a bootstrapped host and deploy real labs |
@@ -97,6 +97,7 @@ Security rules. Each one has an automated test, and a change that weakens one ne
 | `pnpm check` | typecheck, eslint, shellcheck, unit tests, root-helper tests. Run before every commit |
 | `pnpm test:infra` | real-lab tests; needs the bootstrapped host. Until the shell has the `breakfix` group, run `sg breakfix -c 'pnpm test:infra'` |
 | `pnpm test:helpers` | Python unit tests for `infra/bfx_infra` (no root, no Docker) |
+| `pnpm scenario:test <id>` / `--all` | self-test scenarios on real labs (needs the `breakfix` group, like `test:infra`) |
 | `scripts/dev-tools.sh` | pinned gitleaks + shellcheck into `.tools/bin`, enables the pre-push hook |
 | `sudo scripts/bootstrap.sh` | owner only; re-run after changing anything in `infra/` or `scripts/versions.env` |
 | `sudo -n /usr/local/sbin/breakfix-clab list` | labs currently deployed |

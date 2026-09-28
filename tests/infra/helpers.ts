@@ -2,8 +2,8 @@ import { execFile } from "node:child_process";
 import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { PassThrough } from "node:stream";
 import { promisify } from "node:util";
+import { type ProbeOutput, execCollect } from "@breakfix/scenario-kit";
 import Docker from "dockerode";
 import { parse, stringify } from "yaml";
 
@@ -43,46 +43,11 @@ export function guardDocker(): Docker {
   return new Docker({ socketPath: GUARD_APP_SOCKET });
 }
 
-export interface ExecResult {
-  exitCode: number | null;
-  stdout: string;
-  stderr: string;
-}
+export type ExecResult = ProbeOutput;
 
-export async function execIn(
-  docker: Docker,
-  container: string,
-  cmd: string[],
-  stdin?: string,
-): Promise<ExecResult> {
-  const exec = await docker.getContainer(container).exec({
-    Cmd: cmd,
-    AttachStdin: stdin !== undefined,
-    AttachStdout: true,
-    AttachStderr: true,
-  });
-  const stream = await exec.start({ hijack: true, stdin: stdin !== undefined });
-  if (stdin !== undefined) {
-    stream.write(stdin);
-    stream.end();
-  }
-  const out = new PassThrough();
-  const err = new PassThrough();
-  const chunks: { out: Buffer[]; err: Buffer[] } = { out: [], err: [] };
-  out.on("data", (c: Buffer) => chunks.out.push(c));
-  err.on("data", (c: Buffer) => chunks.err.push(c));
-  docker.modem.demuxStream(stream, out, err);
-  await new Promise<void>((resolve, reject) => {
-    stream.on("end", resolve);
-    stream.on("close", resolve);
-    stream.on("error", reject);
-  });
-  const info = await exec.inspect();
-  return {
-    exitCode: info.ExitCode,
-    stdout: Buffer.concat(chunks.out).toString("utf8"),
-    stderr: Buffer.concat(chunks.err).toString("utf8"),
-  };
+/** Run a command through docker-guard (the scenario kit's exec path, used by the server too). */
+export function execIn(_docker: Docker, container: string, cmd: string[], stdin?: string): Promise<ExecResult> {
+  return execCollect(container, cmd, stdin);
 }
 
 export type Topology = {
