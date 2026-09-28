@@ -1,6 +1,6 @@
 # Plan
 
-Status: **M3 done (28 Sep 2026).** Next: M4, the web UI, then STOP for owner feedback.
+Status: **M4 done (28 Sep 2026). STOPPED for owner feedback** (brief: M5 starts only after it). Review deployment: this host, port 8480, basic auth.
 
 ## Decisions and brief issues
 
@@ -30,6 +30,8 @@ Status: **M3 done (28 Sep 2026).** Next: M4, the web UI, then STOP for owner fee
 | B21 | Test links are needed from M3 on, but the admin UI is M5. | `pnpm admin link <scenario>` prints a link (same DB and config as the server). M5 adds the UI on top of the same service call. |
 | B22 | Hints | Candidates open hints one at a time; each opening is logged in the timeline (`hint N`), so the assessment knows. |
 | B23 | Packet-path animation | Drawn from the routers' live routing tables and interface state (longest match, next hop must answer on the link, interfaces up), forward and return path. It is a model of forwarding; the ping's own result stays the truth shown in the console. |
+| B24 | Found by the M4 e2e run next to the live server: the production reaper destroyed the e2e server's lab (no session in *its* database). | `INSTANCE_ID` per server; session labs are `bfx-s-<instance>-…` and a reaper only touches its own instance's labs. Tested. |
+| B25 | The server needs `sudo breakfix-clab`, so its systemd unit cannot set `NoNewPrivileges`/`ProtectSystem`. | Lighter sandboxing documented in docs/security.md; the fix (wrapper behind a root socket) is in IDEAS.md. |
 | B15 | B6 (internet access) | **Resolved from the source:** with `network-mode: none` on every node and `mgmt.skip-when-unused: true`, containerlab creates no management network and does not edit `/etc/hosts`. Nodes have only lab links. No firewall rule needed; a test proves no outbound path. |
 
 ## Pinned versions (checked 28 Sep 2026; digests recorded in M0)
@@ -95,13 +97,13 @@ Each milestone ends with its tests green, docs updated and a commit.
 - [x] Security tests: vtysh escapes, host-console injection, no internet, tokens, cookies, rate limit, origin, log redaction, headers, not-root, reaper, polling not logged; plus a boot test of the built server.
 
 ### M4: Web UI → then STOP
-- [ ] Test landing page (`/t/<token>`): scenario title, rules, start; queue position while waiting.
-- [ ] Workspace: ticket + countdown; the live topology diagram is the main screen (link and protocol state colours, legend, packet animation); click a node to open its terminal tab; host console tabs; submit with confirmation.
-- [ ] Results: pass/fail per objective, time taken, per-device command log with timestamps, config diff per router.
-- [ ] Desktop-first, readable at 390 px wide.
-- [ ] Playwright e2e on a real lab: start scenario 01, fix it in the terminal, submit, see all objectives pass. Visual test: a broken link turns red on the diagram.
-- [ ] Deploy: systemd service `breakfix-server` as user `breakfix` on :8480 with basic auth (from `.env`).
-- [ ] **STOP**: send the owner the URL, the basic-auth login and Playwright screenshots (desktop + mobile), then wait for feedback.
+- [x] Test landing page (`/t/<token>`): preview (title, difficulty, time, devices), rules, start; the token leaves the address bar at once; queue position while waiting.
+- [x] Workspace: ticket, hints (logged), countdown, live topology as the main screen (link up/down, OSPF and BGP status, interface names, legend, packet animation out and back with the drop reason), click a node to open its terminal tab, host console tabs, submit with confirmation.
+- [x] Results: pass/fail per objective with the reason, time taken, per-device command log with timestamps, config diff per router, JSON download.
+- [x] Desktop-first, usable at 390 px (no sideways scrolling; opening a device scrolls to its terminal).
+- [x] Playwright e2e on real labs: scenario 01 fixed in the browser (4/4), a shut link turns red, phone-width run.
+- [x] Deploy: `breakfix-server.service` as `breakfix` on :8480 with basic auth; `scripts/deploy.sh`; verified end to end on the live service.
+- [x] **STOP**: URL, login and screenshots sent to the owner. Waiting for feedback.
 
 ### M5: Admin (after owner feedback)
 - [ ] Admin login (password from env, hashed compare, rate-limited).

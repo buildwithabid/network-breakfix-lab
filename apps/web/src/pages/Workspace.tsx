@@ -110,7 +110,14 @@ export function Workspace() {
           <summary>
             <h2>Ticket</h2>
           </summary>
-          <p className="ticket-text">{s.ticket}</p>
+          <div className="ticket-text">
+            {s.ticket
+              .trim()
+              .split(/\n\s*\n/)
+              .map((para, i) => (
+                <p key={i}>{para.replace(/\s*\n\s*/g, " ")}</p>
+              ))}
+          </div>
         </details>
         <section>
           <h2>Devices</h2>

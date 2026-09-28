@@ -34,11 +34,13 @@ pnpm --silent -r --filter '@breakfix/server...' --filter @breakfix/web run build
 
 log "Assemble $APP.new"
 rm -rf "$APP.new"
-pnpm --silent --filter @breakfix/server deploy --prod "$APP.new" >/dev/null
+# Copies, not hard links into the pnpm store: the permissions below must not touch the store.
+pnpm --silent --filter @breakfix/server deploy --prod --config.package-import-method=copy "$APP.new" >/dev/null
 cp -r apps/web/dist "$APP.new/web"
 cp -r scenarios "$APP.new/scenarios"
 cp -r docs "$APP.new/docs"
-chmod -R g+rX,o-rwx "$APP.new"
+chgrp -R breakfix "$APP.new"
+chmod -R g+rX,g-w,o-rwx "$APP.new"
 
 if [[ ! -f "$ENV_FILE" ]]; then
   log "First deploy: writing $ENV_FILE"

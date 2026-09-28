@@ -69,6 +69,8 @@ export interface SessionServiceOptions {
   maxConcurrent: number;
   pollIntervalMs: number;
   log: Logger;
+  /** Lab names are bfx-s-<instanceId>-…; the reaper only touches its own instance's labs. */
+  instanceId?: string;
   startTimeoutMs?: number;
 }
 
@@ -89,6 +91,10 @@ export class SessionService extends EventEmitter {
 
   constructor(private readonly opts: SessionServiceOptions) {
     super();
+  }
+
+  get instanceId(): string {
+    return this.opts.instanceId ?? "main";
   }
 
   private scenarioOf(session: SessionRow): Scenario {
@@ -249,7 +255,7 @@ export class SessionService extends EventEmitter {
     const session = this.opts.store.session(sessionId);
     if (!session) return;
     const scenario = this.scenarioOf(session);
-    const labName = newLabName("s");
+    const labName = newLabName("s", this.instanceId);
     this.starting.add(sessionId);
     this.opts.store.updateSession(sessionId, { state: "starting", lab_name: labName });
     this.emitView(sessionId);

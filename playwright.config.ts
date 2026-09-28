@@ -7,6 +7,7 @@ import { defineConfig, devices } from "@playwright/test";
 export const E2E_PORT = 8490;
 export const E2E_ENV = {
   PORT: String(E2E_PORT),
+  INSTANCE_ID: "e2e", // keeps the production server's reaper away from e2e labs, and vice versa
   HOST: "127.0.0.1",
   DB_PATH: ".e2e/db.sqlite",
   PUBLIC_URL: `http://127.0.0.1:${E2E_PORT}`,

@@ -245,8 +245,7 @@ button {
 .ticket summary h2 {
   display: inline;
 }
-.ticket-text {
-  white-space: pre-wrap;
+.ticket-text p {
   margin: 0.5rem 0 0;
 }
 .devices {

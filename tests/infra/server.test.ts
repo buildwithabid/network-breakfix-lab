@@ -52,7 +52,7 @@ beforeAll(async () => {
   const scenarios = new Map([[s01.meta.id, s01]]);
   store = new Store(config.DB_PATH);
   const logger = createLogger(config);
-  service = new SessionService({ store, driver: containerlabDriver, scenarios, maxConcurrent: 2, pollIntervalMs: 2000, log: logger });
+  service = new SessionService({ store, driver: containerlabDriver, scenarios, maxConcurrent: 2, pollIntervalMs: 2000, log: logger, instanceId: "it" });
   app = await buildApp({ config, service, store, scenarios, logger });
   base = await app.listen({ port: 0, host: "127.0.0.1" });
 

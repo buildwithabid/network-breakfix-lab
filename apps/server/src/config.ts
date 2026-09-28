@@ -7,6 +7,8 @@ const bool = z.enum(["0", "1", "true", "false"]).transform((v) => v === "1" || v
 const Env = z.object({
   HOST: z.string().default("127.0.0.1"),
   PORT: z.coerce.number().int().min(1).max(65535).default(8480),
+  /** Names this server's labs (bfx-s-<id>-…). Servers sharing a host need different ids. */
+  INSTANCE_ID: z.string().regex(/^[a-z0-9]{1,12}$/, "lowercase letters and digits, max 12").default("main"),
   DB_PATH: z.string().default("./data/breakfix.db"),
   SCENARIOS_DIR: z.string().default("./scenarios"),
   WEB_DIST: z.string().default("./apps/web/dist"),

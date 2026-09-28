@@ -88,7 +88,7 @@ describe("lab lifecycle", () => {
     await until(() => service.view(id)?.state === "running");
     const lab = [...driver.labs.values()][0];
     if (!lab) throw new Error("no lab");
-    expect(lab.name).toMatch(/^bfx-s-/);
+    expect(lab.name).toMatch(/^bfx-s-main-[0-9a-f]{10}$/);
     lab.healthy = true;
     lab.config = lab.config.replace("/31", "/30");
     await service.submit(id, "submitted");
@@ -150,10 +150,11 @@ describe("restart and reaper", () => {
     const { service, driver, store } = setup();
     const id = service.start(service.createTestLink("01-wrong-ip-mask").token).sessionId;
     await until(() => service.view(id)?.state === "running");
-    await driver.deploy(s01, "fault", "bfx-s-orphan");
+    await driver.deploy(s01, "fault", "bfx-s-main-orphan");
+    await driver.deploy(s01, "fault", "bfx-s-other-theirs"); // another server's lab on the same host
     const destroyed = await reapOnce({ driver, store, service, log: quietLog });
-    expect(destroyed).toEqual(["bfx-s-orphan"]);
-    expect(await driver.list()).toHaveLength(1);
+    expect(destroyed).toEqual(["bfx-s-main-orphan"]);
+    expect((await driver.list()).map((l) => l.lab).sort()).toEqual([store.session(id)?.lab_name, "bfx-s-other-theirs"].sort());
   });
 });
 

@@ -26,6 +26,7 @@ const service = new SessionService({
   maxConcurrent: config.MAX_CONCURRENT_LABS,
   pollIntervalMs: config.POLL_INTERVAL_MS,
   log: logger,
+  instanceId: config.INSTANCE_ID,
 });
 const app = await buildApp({ config, service, store, scenarios, logger });
 

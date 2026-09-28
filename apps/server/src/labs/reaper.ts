@@ -15,15 +15,15 @@ export interface ReaperDeps {
 }
 
 /**
- * Destroy labs nobody should be using: session labs whose session is over, unknown, or long past
- * its deadline, and test labs older than two hours. Labs the service is actively running are left
- * alone; their own timers end them.
+ * Destroy labs nobody should be using: this instance's session labs whose session is over, unknown,
+ * or long past its deadline, and test labs older than two hours. Labs the service is actively
+ * running are left alone (their own timers end them), and so are other instances' session labs.
  */
 export async function reapOnce(deps: ReaperDeps, now = Date.now()): Promise<string[]> {
   const destroyed: string[] = [];
   for (const lab of await deps.driver.list()) {
     let reason: string | undefined;
-    if (lab.lab.startsWith("bfx-s-")) {
+    if (lab.lab.startsWith(`bfx-s-${deps.service.instanceId}-`)) {
       if (deps.service.isActiveLab(lab.lab)) continue;
       const session = deps.store.sessionByLab(lab.lab);
       if (!session) reason = "no session";

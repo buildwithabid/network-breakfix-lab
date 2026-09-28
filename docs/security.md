@@ -125,7 +125,7 @@ two can never drift apart.
 | Optional basic auth | whole site, constant-time compare, for private review deployments | `http/app.test.ts` |
 | Not root | the server exits at start-up if its uid is 0 | `security/root.test.ts` |
 | Polling is invisible | the live diagram's `show … json` polling runs through a separate exec, never a candidate terminal, so it never enters the command log | `service.test.ts`, `server.test.ts` |
-| Leftover labs | the reaper destroys session labs whose session is over, unknown, or 5 min past its deadline, and test labs older than 2 h | `service.test.ts`, `tests/infra/reaper.test.ts` |
+| Leftover labs | the reaper destroys its own instance's session labs (`bfx-s-<INSTANCE_ID>-…`) whose session is over, unknown, or 5 min past its deadline, and test labs older than 2 h; other instances' labs are never touched | `service.test.ts`, `tests/infra/reaper.test.ts` |
 
 ### The service unit
 

@@ -1,4 +1,4 @@
-import { mkdirSync } from "node:fs";
+import { chmodSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import Database from "better-sqlite3";
 import { MIGRATIONS } from "./migrations.js";
@@ -70,6 +70,18 @@ export class Store {
     this.db.pragma("foreign_keys = ON");
     this.db.pragma("busy_timeout = 5000");
     this.migrate();
+    if (path !== ":memory:") {
+      // SQLite creates files 0644 whatever the umask. Make them group-writable so the admin CLI
+      // (a member of the service's group) can create test links; SQLite gives its WAL and SHM
+      // files the same mode as the database. The directory's permissions decide who is in.
+      for (const file of [path, `${path}-wal`, `${path}-shm`]) {
+        try {
+          chmodSync(file, 0o660);
+        } catch {
+          // not ours, or not created yet
+        }
+      }
+    }
   }
 
   private migrate(): void {

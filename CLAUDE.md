@@ -30,6 +30,7 @@ Public portfolio project: code quality, tests, security and docs weigh as much a
 - If the brief is technically wrong or blocks progress, say so, propose the smallest fix and record
   it under "Decisions and brief issues" in PLAN.md. Never silently work around it.
 - **STOP after M4**: serve it, send the URL and Playwright screenshots, wait for feedback.
+  (Reached 28 Sep 2026: do not start M5 until the owner has given feedback.)
 
 ## Stack (fixed)
 
@@ -103,3 +104,5 @@ Security rules. Each one has an automated test, and a change that weakens one ne
 | `sudo -n /usr/local/sbin/breakfix-clab list` | labs currently deployed |
 | `pnpm admin link <scenario>` | print a single-use test link (until the M5 admin UI) |
 | `pnpm server` | build and run the server (reads `.env`); as a dev user run it under `sg breakfix` |
+| `sg breakfix -c 'pnpm test:e2e'` | Playwright on real labs (INSTANCE_ID e2e, port 8490) |
+| `scripts/deploy.sh` | build and deploy to /srv/breakfix/app, restart `breakfix-server.service` |
