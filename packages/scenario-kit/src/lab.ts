@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { PassThrough } from "node:stream";
+import { type Duplex, PassThrough } from "node:stream";
 import { promisify } from "node:util";
 import Docker from "dockerode";
 import type { ProbeRunner } from "./checker/engine.js";
@@ -87,6 +87,48 @@ export async function execCollect(container: string, cmd: string[], stdin?: stri
   };
 }
 
+/** Run a non-interactive command and stream stdout+stderr as it arrives. Resolves to the exit code. */
+export async function execStream(container: string, cmd: string[], onData: (chunk: string) => void): Promise<number | null> {
+  const exec = await docker().getContainer(container).exec({ Cmd: cmd, AttachStdout: true, AttachStderr: true });
+  const stream = await exec.start({ hijack: true, stdin: false });
+  const sink = new PassThrough();
+  sink.on("data", (c: Buffer) => onData(c.toString("utf8")));
+  docker().modem.demuxStream(stream, sink, sink);
+  await new Promise<void>((resolve, reject) => {
+    stream.on("end", resolve);
+    stream.on("close", resolve);
+    stream.on("error", reject);
+  });
+  return (await exec.inspect()).ExitCode;
+}
+
+export interface RouterTerminal {
+  /** Raw TTY stream: write keystrokes, read screen output. */
+  stream: Duplex;
+  resize(cols: number, rows: number): Promise<void>;
+  close(): void;
+}
+
+/** Start an interactive vtysh on a router (docker-guard forces VTYSH_PAGER=cat and TERM). */
+export async function openRouterTerminal(container: string, cols: number, rows: number): Promise<RouterTerminal> {
+  const exec = await docker().getContainer(container).exec({
+    Cmd: ["vtysh"],
+    Tty: true,
+    AttachStdin: true,
+    AttachStdout: true,
+    AttachStderr: true,
+    ConsoleSize: [rows, cols],
+  });
+  const stream = (await exec.start({ hijack: true, stdin: true, Tty: true })) as Duplex;
+  return {
+    stream,
+    resize: async (c, r) => {
+      await exec.resize({ w: c, h: r });
+    },
+    close: () => stream.destroy(),
+  };
+}
+
 const active = new Set<Lab>();
 
 /** A deployed lab. Tracked until destroyed so an interrupted run can still clean up. */
@@ -99,6 +141,19 @@ export class Lab implements ProbeRunner {
   static async deploy(dir: string): Promise<Lab> {
     const result = (await clab(["deploy", dir])) as { lab: string; nodes: LabNode[] };
     const lab = new Lab(result.lab, new Map(result.nodes.map((n) => [n.node, n])));
+    active.add(lab);
+    return lab;
+  }
+
+  /** Re-attach to a lab deployed earlier (e.g. by a previous server process). */
+  static async attach(name: string, roles: Record<string, Role>): Promise<Lab | undefined> {
+    const summary = (await Lab.list()).find((l) => l.lab === name);
+    if (!summary || summary.nodes.length === 0) return undefined;
+    const nodes = summary.nodes.flatMap((n) => {
+      const role = roles[n.node];
+      return role ? [{ node: n.node, container: n.container, role }] : [];
+    });
+    const lab = new Lab(name, new Map(nodes.map((n) => [n.node, n])));
     active.add(lab);
     return lab;
   }
@@ -130,6 +185,24 @@ export class Lab implements ProbeRunner {
     return execCollect(this.container(node, "host"), argv);
   }
 
+  /** Several `show … json` commands in one exec; returns one parsed document (or null) per command. */
+  async vtyshJson(router: string, commands: string[]): Promise<unknown[]> {
+    const out = await execCollect(
+      this.container(router, "router"),
+      ["vtysh", ...commands.flatMap((c) => ["-c", c])],
+    );
+    const docs = splitJsonDocuments(out.stdout);
+    return commands.map((_, i) => docs[i] ?? null);
+  }
+
+  openTerminal(router: string, cols: number, rows: number): Promise<RouterTerminal> {
+    return openRouterTerminal(this.container(router, "router"), cols, rows);
+  }
+
+  hostStream(node: string, argv: string[], onData: (chunk: string) => void): Promise<number | null> {
+    return execStream(this.container(node, "host"), argv, onData);
+  }
+
   run(probe: Probe): Promise<ProbeOutput> {
     return probe.kind === "vtysh" ? this.vtysh(probe.node, probe.command) : this.host(probe.node, probe.argv);
   }
@@ -152,6 +225,43 @@ export class Lab implements ProbeRunner {
 /** Destroy every lab this process deployed and has not destroyed yet. */
 export async function destroyActiveLabs(): Promise<void> {
   await Promise.allSettled([...active].map((lab) => lab.destroy()));
+}
+
+/**
+ * vtysh prints one JSON document per `-c` command, back to back. Split them; a document that does
+ * not parse becomes null so the caller can tell which command failed.
+ */
+export function splitJsonDocuments(text: string): (unknown | null)[] {
+  const docs: (unknown | null)[] = [];
+  let depth = 0;
+  let start = -1;
+  let inString = false;
+  let escaped = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (ch === "\\") escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') inString = true;
+    else if (ch === "{" || ch === "[") {
+      if (depth === 0) start = i;
+      depth++;
+    } else if ((ch === "}" || ch === "]") && depth > 0) {
+      depth--;
+      if (depth === 0 && start >= 0) {
+        try {
+          docs.push(JSON.parse(text.slice(start, i + 1)));
+        } catch {
+          docs.push(null);
+        }
+        start = -1;
+      }
+    }
+  }
+  return docs;
 }
 
 export function sleep(ms: number): Promise<void> {

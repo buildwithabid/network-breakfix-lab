@@ -1,7 +1,19 @@
 export { type ObjectiveResult, type ProbeRunner, checkObjectives } from "./checker/engine.js";
 export { type Probe, type ProbeOutput, type Verdict, evaluate, probeFor } from "./checker/rules.js";
 export * from "./constants.js";
-export { Lab, type LabNode, type LabSummary, WrapperError, clab, destroyActiveLabs, execCollect } from "./lab.js";
+export {
+  Lab,
+  type LabNode,
+  type LabSummary,
+  type RouterTerminal,
+  WrapperError,
+  clab,
+  destroyActiveLabs,
+  execCollect,
+  execStream,
+  openRouterTerminal,
+  splitJsonDocuments,
+} from "./lab.js";
 export { LAB_NAME_MAX, LAB_NAME_PATTERN, type LabKind, isLabName, newLabName } from "./lab-name.js";
 export {
   type ConfigSet,

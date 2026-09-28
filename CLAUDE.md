@@ -101,3 +101,5 @@ Security rules. Each one has an automated test, and a change that weakens one ne
 | `scripts/dev-tools.sh` | pinned gitleaks + shellcheck into `.tools/bin`, enables the pre-push hook |
 | `sudo scripts/bootstrap.sh` | owner only; re-run after changing anything in `infra/` or `scripts/versions.env` |
 | `sudo -n /usr/local/sbin/breakfix-clab list` | labs currently deployed |
+| `pnpm admin link <scenario>` | print a single-use test link (until the M5 admin UI) |
+| `pnpm server` | build and run the server (reads `.env`); as a dev user run it under `sg breakfix` |

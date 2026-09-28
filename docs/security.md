@@ -102,7 +102,30 @@ single files lets `write memory` rename and save its files like on a real router
 - **Hosts:** no TTY. Only `ping` (count ≤ 10), `traceroute`, `ip addr|route|link|neigh show` and
   `ip route get`, with every argument checked. The server validates first and the guard checks again.
 
-Shell-escape tests inside an interactive vtysh (`start-shell`, the pager) are added in M3.
+Verified inside a live router terminal (`tests/infra/server.test.ts`): `start-shell` (and its `bash`
+form) is not compiled into this vtysh ("% Unknown command"); `terminal paginate` + `show running-config`
++ `!sh` starts no pager and no shell; `ssh`, `telnet` and shell syntax lead nowhere; a shell marker
+(`echo PWNED-$((6*7))`) never evaluates. The same file checks the host console refuses `sh`, `;`, `$(…)`,
+`ip addr add`, `cat /etc/shadow`, and that a lab host cannot ping `1.1.1.1`.
+
+The host console parser (`apps/server/src/terminals/host-commands.ts`) is stricter than the guard; a
+unit test runs every command form the console can produce through the guard's Python policy, so the
+two can never drift apart.
+
+## Sessions and the web server
+
+| Control | How | Test |
+|---|---|---|
+| Unguessable test links | 256-bit random token (`/t/<43 chars>`); only its SHA-256 is stored; single use (claimed in the same transaction that creates the session); optional expiry | `apps/server/src/sessions/service.test.ts` |
+| Session cookie | `<id>.<256-bit secret>`, HttpOnly, SameSite=Strict, Secure behind HTTPS; the secret is stored hashed and compared in constant time | `http/app.test.ts` |
+| Brute force | test-link redemption rate-limited per IP (`START_RATE_LIMIT`, default 10/min) | `http/app.test.ts` |
+| WebSocket | cookie required; `Origin` must match `PUBLIC_URL`; every message validated (zod), 64 KB max, 200 msg/s; anything else closes the socket | `http/app.test.ts` |
+| Logs | pino redacts cookies and auth headers; `/t/<token>` is scrubbed from URLs and from message text | `http/app.test.ts` |
+| Headers | CSP `default-src 'self'`, `frame-ancestors 'none'`, nosniff, `Referrer-Policy: no-referrer` (a token in the URL never leaks via Referer) | `http/app.test.ts` |
+| Optional basic auth | whole site, constant-time compare, for private review deployments | `http/app.test.ts` |
+| Not root | the server exits at start-up if its uid is 0 | `security/root.test.ts` |
+| Polling is invisible | the live diagram's `show … json` polling runs through a separate exec, never a candidate terminal, so it never enters the command log | `service.test.ts`, `server.test.ts` |
+| Leftover labs | the reaper destroys session labs whose session is over, unknown, or 5 min past its deadline, and test labs older than 2 h | `service.test.ts`, `tests/infra/reaper.test.ts` |
 
 ## Host protection
 

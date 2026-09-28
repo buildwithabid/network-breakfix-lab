@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync, statSync } from "node:fs";
 import { createConnection } from "node:net";
+import { homedir } from "node:os";
 import { describe, expect, it } from "vitest";
 import { CLAB_WRAPPER, GUARD_APP_SOCKET, GUARD_DEPLOY_SOCKET } from "./helpers.js";
 
@@ -50,6 +51,15 @@ describe("host preparation (scripts/bootstrap.sh)", () => {
         stderr = String((err as { stderr?: Buffer }).stderr ?? "");
       }
       expect(stderr, cmd.join(" ")).toMatch(/password is required/);
+    }
+  });
+
+  it("keeps the developer's home unreadable for the service users", () => {
+    const home = statSync(homedir());
+    expect(home.mode & 0o077).toBe(0);
+    for (const user of ["breakfix", "bfx-guard"]) {
+      const gids = execFileSync("id", ["-G", user], { encoding: "utf8" }).trim().split(/\s+/).map(Number);
+      expect(gids, user).not.toContain(home.gid);
     }
   });
 

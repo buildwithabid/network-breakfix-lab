@@ -1,6 +1,6 @@
 # Plan
 
-Status: **M2 done (28 Sep 2026).** Next: M3, the server.
+Status: **M3 done (28 Sep 2026).** Next: M4, the web UI, then STOP for owner feedback.
 
 ## Decisions and brief issues
 
@@ -27,6 +27,9 @@ Status: **M2 done (28 Sep 2026).** Next: M3, the server.
 | B18 | Self-test semantics for B9's workaround | A workaround must restore every `reachability` objective **and** still fail another one, in two checks 5 s apart. "At least one fails" alone would also pass a workaround fixture that doesn't work. |
 | B19 | `route-present (router, prefix, required protocol)` | An optional `nexthop` was added. Scenario 01 needs it to tell "r2 routes back via r1" from a route that merely exists. |
 | B20 | Scenario 05's shortcut is deleting the filter, and none of the brief's five rule types can express "must not be received". | Objectives take an optional `negate: true`. An unreadable node (crashed daemon, failed probe) never passes a negated objective. |
+| B21 | Test links are needed from M3 on, but the admin UI is M5. | `pnpm admin link <scenario>` prints a link (same DB and config as the server). M5 adds the UI on top of the same service call. |
+| B22 | Hints | Candidates open hints one at a time; each opening is logged in the timeline (`hint N`), so the assessment knows. |
+| B23 | Packet-path animation | Drawn from the routers' live routing tables and interface state (longest match, next hop must answer on the link, interfaces up), forward and return path. It is a model of forwarding; the ping's own result stays the truth shown in the console. |
 | B15 | B6 (internet access) | **Resolved from the source:** with `network-mode: none` on every node and `mgmt.skip-when-unused: true`, containerlab creates no management network and does not edit `/etc/hosts`. Nodes have only lab links. No firewall rule needed; a test proves no outbound path. |
 
 ## Pinned versions (checked 28 Sep 2026; digests recorded in M0)
@@ -80,16 +83,16 @@ Each milestone ends with its tests green, docs updated and a commit.
 - [x] `pnpm scenario:test --all` green: 5/5, every workaround caught
 
 ### M3: Server
-- [ ] SQLite schema + migrations: tests, sessions, events (per-device command log), config snapshots, objective results. It also exports a versioned "assessment bundle" JSON per session so an AI assessment step can be added later (no AI now).
-- [ ] Session API: start from a token link, state, submit. Tokens are 256-bit, stored as SHA-256. Rate limits on session creation.
-- [ ] Lab lifecycle: queue + concurrency cap (default 5); per-node CPU, memory and PID limits; timeout → auto-submit → destroy.
-- [ ] Reaper: on start and every minute, destroy `bfx-` labs that have expired or have no session record.
-- [ ] WebSocket terminals: router → interactive `vtysh` TTY through `docker-guard`; host → restricted console (whitelisted commands, validated args, argv exec).
-- [ ] Command capture: a server-side headless terminal (`@xterm/headless`) mirrors each router TTY. On Enter it records the line as displayed, so tab completion, history and editing are captured exactly, with timestamps.
-- [ ] Config capture: `show running-config` per router at start and at submit; unified diff stored.
-- [ ] Live state for the diagram: a poller (every ~3 s per active lab) reads interface, OSPF neighbour and BGP summary JSON and pushes changes over the session WebSocket. Excluded from the command log.
-- [ ] Packet path: for each candidate ping/traceroute, compute the forward and return path hop by hop from the routers' real routing tables, and emit a path event that marks where it stops.
-- [ ] Security tests for rules 1–7 in CLAUDE.md, plus: `breakfix` cannot read the owner's home; lab containers sit inside `breakfix.slice`; the limits read back correctly from `docker inspect`.
+- [x] SQLite schema + migrations (tests, sessions, commands, config snapshots, objective results) and a versioned assessment bundle per session (`docs/results.md`); no AI.
+- [x] Session API: redeem a test link (single use, 256-bit, stored hashed), session view, submit, results, bundle. Rate-limited redemption. Cookie auth (HttpOnly, SameSite=Strict).
+- [x] Lab lifecycle: FIFO queue behind a concurrency cap (default 5); per-node limits from the wrapper; timeout → auto-submit → destroy; resume after a restart.
+- [x] Reaper: at start and every minute.
+- [x] WebSocket: router terminal = interactive `vtysh` TTY through `docker-guard`; host = restricted console (validated argv, no shell).
+- [x] Command capture via a headless xterm (tab completion, history and paste handled; tested).
+- [x] Config capture at start and submit; unified diff.
+- [x] Live state poller (interfaces, OSPF, BGP, routes) → topology state over the socket; never in the command log.
+- [x] Packet path for pings/traceroutes (host console and vtysh), forward and back (B23).
+- [x] Security tests: vtysh escapes, host-console injection, no internet, tokens, cookies, rate limit, origin, log redaction, headers, not-root, reaper, polling not logged; plus a boot test of the built server.
 
 ### M4: Web UI → then STOP
 - [ ] Test landing page (`/t/<token>`): scenario title, rules, start; queue position while waiting.

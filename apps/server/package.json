@@ -6,9 +6,28 @@
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "start": "node dist/main.js"
   },
   "dependencies": {
-    "@breakfix/scenario-kit": "workspace:*"
+    "@breakfix/scenario-kit": "workspace:*",
+    "@fastify/cookie": "11.1.2",
+    "@fastify/rate-limit": "11.2.0",
+    "@fastify/static": "10.1.5",
+    "@fastify/websocket": "11.3.1",
+    "@xterm/headless": "6.0.0",
+    "better-sqlite3": "13.0.3",
+    "diff": "9.0.0",
+    "fastify": "5.12.5",
+    "pino": "10.3.1",
+    "zod": "4.6.5"
+  },
+  "bin": {
+    "breakfix-admin": "./dist/admin-cli.js"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "9.6.0",
+    "@types/ws": "8.18.1",
+    "ws": "8.22.0"
   }
 }

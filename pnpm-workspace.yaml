@@ -2,9 +2,11 @@ packages:
   - apps/*
   - packages/*
 
-# Dependency install scripts are denied unless listed here. These three belong to dockerode's
-# optional SSH transport and protobuf tooling, which this project does not use.
+# Dependency install scripts are denied unless listed here.
 allowBuilds:
+  # native SQLite binding for the server (downloads a prebuilt binary or compiles it)
+  better-sqlite3: true
+  # dockerode's optional SSH transport and protobuf tooling: not used by this project
   cpu-features: false
   protobufjs: false
   ssh2: false

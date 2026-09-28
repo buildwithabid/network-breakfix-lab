@@ -13,3 +13,4 @@ clab-*/
 .tools/
 __pycache__/
 *.pyc
+data/

@@ -18,19 +18,24 @@
     "test:helpers": "python3 -m unittest discover -s infra/tests -t infra",
     "test:infra": "vitest run --project infra",
     "check": "pnpm typecheck && pnpm lint && pnpm lint:sh && pnpm test && pnpm test:helpers",
-    "scenario:test": "pnpm --silent --filter @breakfix/scenario-kit run build && node packages/scenario-kit/dist/cli.js test"
+    "scenario:test": "pnpm --silent --filter @breakfix/scenario-kit run build && node packages/scenario-kit/dist/cli.js test",
+    "server": "pnpm --silent -r --filter @breakfix/server... run build && node --env-file-if-exists=.env apps/server/dist/main.js",
+    "admin": "pnpm --silent -r --filter @breakfix/server... run build && node --env-file-if-exists=.env apps/server/dist/admin-cli.js"
   },
   "devDependencies": {
     "@breakfix/scenario-kit": "workspace:*",
     "@eslint/js": "10.0.1",
     "@types/dockerode": "4.0.1",
     "@types/node": "22.20.4",
+    "@types/ws": "8.18.1",
     "dockerode": "5.0.1",
     "eslint": "10.11.0",
+    "fastify": "5.12.5",
     "globals": "17.12.0",
     "typescript": "6.0.3",
     "typescript-eslint": "8.70.1",
     "vitest": "5.0.2",
+    "ws": "8.22.0",
     "yaml": "2.9.1"
   }
 }

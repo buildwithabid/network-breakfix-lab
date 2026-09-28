@@ -6,8 +6,8 @@ the fault in real router CLIs in the browser. Routers are [FRRouting](https://fr
 containers and hosts are small Linux containers, wired by [containerlab](https://containerlab.dev).
 On submit, a checker verifies the network was fixed the intended way.
 
-> **Status:** M2 done: five CCNA-level scenarios, each self-tested on real FRR labs (baseline passes,
-> fault fails, a tempting workaround is still caught). Next: the server (M3). See [PLAN.md](PLAN.md).
+> **Status:** M3 done: five self-tested scenarios and the server (sessions, live router terminals,
+> restricted host consoles, command capture, checks, results). Next: the web UI (M4). See [PLAN.md](PLAN.md).
 
 ## Why it is built this way
 
@@ -36,13 +36,21 @@ pnpm test:infra               # deploys real labs: hardening checks and scenario
 pnpm scenario:test --all      # self-test every scenario: baseline passes, fault fails, workaround is caught
 ```
 
-Writing a scenario: [docs/scenarios.md](docs/scenarios.md).
+Writing a scenario: [docs/scenarios.md](docs/scenarios.md). Results and the assessment bundle:
+[docs/results.md](docs/results.md).
+
+Run the server (after `pnpm install`; settings in [.env.example](.env.example)):
+
+```bash
+pnpm admin link 01-wrong-ip-mask   # prints a single-use test link
+pnpm server                         # http://127.0.0.1:8480
+```
 
 ## Layout
 
 | Path | Contents |
 |---|---|
-| `apps/server` | Fastify API, WebSocket terminals, lab lifecycle (M3) |
+| `apps/server` | Fastify API, WebSocket terminals, sessions and lab lifecycle, live state, results |
 | `apps/web` | React UI: ticket, live topology, terminals, results (M4) |
 | `packages/scenario-kit` | scenario schema, loader, renderer, checker, lab runner, `scenario:test` CLI |
 | `scenarios/` | one folder per scenario |
