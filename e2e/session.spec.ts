@@ -57,4 +57,8 @@ test("a link that goes down turns red on the diagram", async ({ page }) => {
   await page.getByTestId("submit").click();
   await page.getByTestId("confirm-submit").click();
   await expect(page).toHaveURL(/\/results$/, { timeout: 120_000 });
+
+  // A finished test in this browser must not block the next link.
+  await page.goto(newLink("03-ospf-timer-mismatch"));
+  await expect(page.getByTestId("test-title")).toHaveText("The data centre fell off the map");
 });

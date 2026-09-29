@@ -327,6 +327,14 @@ button {
 .path-status.bad {
   color: #991b1b;
 }
+.offline {
+  margin: 0;
+  padding: 0.5rem 1rem;
+  background: #fef3c7;
+  color: #92400e;
+  border-top: 1px solid #fcd34d;
+  font-weight: 600;
+}
 .toast {
   position: absolute;
   top: 0.75rem;

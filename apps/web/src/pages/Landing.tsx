@@ -20,9 +20,13 @@ export function Landing({ token: fromUrl }: { token: string }) {
     let cancelled = false;
     (async () => {
       try {
+        // A test already under way in this browser takes priority. A finished one does not:
+        // this link starts a new test.
         const view = await api.session();
-        if (!cancelled) navigate(view.state === "finished" ? "/results" : "/session", true);
-        return;
+        if (!cancelled && view.state !== "finished" && view.state !== "failed") {
+          navigate("/session", true);
+          return;
+        }
       } catch {
         // no session in this browser yet
       }

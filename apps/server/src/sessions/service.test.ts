@@ -46,7 +46,8 @@ describe("test links", () => {
     expect(token).toMatch(/^[A-Za-z0-9_-]{43}$/);
     const { sessionId, secret } = service.start(token);
     expect(service.authenticate(sessionId, secret)?.id).toBe(sessionId);
-    expect(service.authenticate(sessionId, `${secret.slice(0, -1)}A`)).toBeUndefined();
+    const tampered = secret.slice(0, -1) + (secret.endsWith("A") ? "E" : "A"); // always a different secret
+    expect(service.authenticate(sessionId, tampered)).toBeUndefined();
     expect(() => service.start(token)).toThrow(expect.objectContaining({ code: "used" }));
   });
 

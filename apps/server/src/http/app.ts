@@ -42,6 +42,9 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     const expected = `Basic ${Buffer.from(`${config.BASIC_AUTH_USER}:${config.BASIC_AUTH_PASSWORD}`).toString("base64")}`;
     app.addHook("onRequest", async (req, reply) => {
       if (req.url === "/healthz") return;
+      // Browsers do not reliably send basic-auth credentials on WebSocket upgrades. The socket is
+      // still guarded: it needs the session cookie (256-bit secret) and a same-origin request.
+      if (req.url.split("?")[0] === "/api/session/ws") return;
       if (!sameSecret(req.headers.authorization ?? "", expected)) {
         await reply.header("WWW-Authenticate", 'Basic realm="network-breakfix-lab"').code(401).send("Authentication required");
       }

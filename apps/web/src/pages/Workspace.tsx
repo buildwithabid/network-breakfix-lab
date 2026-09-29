@@ -21,6 +21,7 @@ export function Workspace() {
   const [active, setActive] = useState<string>();
   const [confirming, setConfirming] = useState(false);
   const [notice, setNotice] = useState<string>();
+  const [offline, setOffline] = useState(false);
 
   const accept = useCallback((v: SessionView | undefined) => {
     if (!v) return;
@@ -44,6 +45,14 @@ export function Workspace() {
           else if (msg.t === "hint") setHints((h) => (h.includes(msg.text) ? h : [...h, msg.text]));
           else if (msg.t === "error" && !msg.node) setNotice(msg.message);
         });
+        // Only show the banner if the connection stays down for a moment (not on brief blips).
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        s.onStatus((connected) => {
+          clearTimeout(timer);
+          if (connected) setOffline(false);
+          else timer = setTimeout(() => setOffline(true), 2000);
+        });
+        timer = setTimeout(() => setOffline(!s?.connected), 4000);
         setSocket(s);
       })
       .catch((err: unknown) => setError(err instanceof ApiError && err.status === 401 ? "No test is running in this browser. Open your test link to start." : "Could not load your test. Reload the page."));
@@ -171,6 +180,11 @@ export function Workspace() {
             )}
             {socket && <TerminalPane socket={socket} tabs={tabs} active={active} onActivate={setActive} onClose={closeNode} />}
           </>
+        )}
+        {offline && running && (
+          <p className="offline" role="alert" data-testid="offline">
+            Lost the live connection to your lab. Reconnecting… Terminals and the diagram resume when it is back.
+          </p>
         )}
         {notice && (
           <p className="toast" role="alert" onClick={() => setNotice(undefined)}>

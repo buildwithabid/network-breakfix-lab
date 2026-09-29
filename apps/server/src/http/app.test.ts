@@ -33,9 +33,9 @@ afterEach(async () => {
   for (const a of apps.splice(0)) await a.close();
 });
 
-async function startSession(app: FastifyInstance, service: SessionService) {
+async function startSession(app: FastifyInstance, service: SessionService, authorization?: string) {
   const { token } = service.createTestLink("01-wrong-ip-mask");
-  const res = await app.inject({ method: "POST", url: "/api/start", payload: { token } });
+  const res = await app.inject({ method: "POST", url: "/api/start", payload: { token }, headers: authorization ? { authorization } : {} });
   expect(res.statusCode).toBe(200);
   const cookie = res.cookies.find((c) => c.name === COOKIE);
   if (!cookie) throw new Error("no cookie");
@@ -131,7 +131,8 @@ describe("HTTP API", () => {
 describe("WebSocket", () => {
   async function connect(env: Record<string, string> = {}) {
     const ctx = await setup({ PUBLIC_URL: "http://lab.test", ...env });
-    const { header, sessionId } = await startSession(ctx.app, ctx.service);
+    const auth = env.BASIC_AUTH_USER ? `Basic ${Buffer.from(`${env.BASIC_AUTH_USER}:${env.BASIC_AUTH_PASSWORD}`).toString("base64")}` : undefined;
+    const { header, sessionId } = await startSession(ctx.app, ctx.service, auth);
     for (let i = 0; i < 100 && ctx.service.view(sessionId)?.state !== "running"; i++) await new Promise((r) => setTimeout(r, 5));
     const address = await ctx.app.listen({ port: 0, host: "127.0.0.1" });
     const open = (headers: Record<string, string>) => {
@@ -155,6 +156,14 @@ describe("WebSocket", () => {
     const { open, header } = await connect();
     expect(await open({}).closed).toBe(1008);
     expect(await open({ cookie: header, origin: "https://evil.example" }).closed).toBe(1008);
+  });
+
+  it("does not need basic auth on the socket, only the session cookie", async () => {
+    const { open, header } = await connect({ BASIC_AUTH_USER: "review", BASIC_AUTH_PASSWORD: "correct-horse-battery" });
+    const ok = open({ cookie: header, origin: "http://lab.test" });
+    await new Promise((r) => ok.ws.on("open", r));
+    ok.ws.close();
+    expect(await open({ origin: "http://lab.test" }).closed).toBe(1008); // no session: refused
   });
 
   it("accepts the page's own origin, e.g. through an SSH tunnel", async () => {
